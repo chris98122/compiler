@@ -169,7 +169,10 @@ public:
                                                                        new T::EseqExp(new T::LabelStm(t), new T::TempExp(r))))));
   }
   T::Stm *UnNx() const override {}
-  Cx UnCx() const override {}
+  Cx UnCx() const override
+  {
+    return this->cx;
+  }
 };
 
 PatchList *join_patch(PatchList *first, PatchList *second)
@@ -428,9 +431,41 @@ TR::ExpAndTy IfExp::Translate(S::Table<E::EnvEntry> *venv,
 {
   // TODO: Put your codes here (lab5).
   TR::ExpAndTy condition = this->test->Translate(venv, tenv, level, label);
-  TR::ExpAndTy then_type = this->then->Translate(venv, tenv, level, label);
+  TR::ExpAndTy thenexp = this->then->Translate(venv, tenv, level, label);
+  TR::Cx test_ = condition.exp->UnCx();
+  TEMP::Temp *r = TEMP::Temp::NewTemp();
+  TEMP::Label *t = TEMP::NewLabel();
+  TEMP::Label *f = TEMP::NewLabel();
+  do_patch(test_.trues, t);
+  do_patch(test_.falses, f);
 
-  return TR::ExpAndTy(nullptr, TY::VoidTy::Instance());
+  T::Stm *s = condition.exp->UnCx().stm;
+  ((T::CjumpStm *)s)->true_label = t;
+  T::EseqExp *ifexp;
+  if (elsee)
+  {
+    TR::ExpAndTy else_tr = this->elsee->Translate(venv, tenv, level, label);
+    if (else_tr.ty != TY::VoidTy::Instance())
+    {
+      ifexp = new T::EseqExp(test_.stm,
+                             new T::EseqExp(
+                                 new T::LabelStm(t),
+                                 new T::EseqExp(
+                                     new T::MoveStm(new T::TempExp(r), thenexp.exp->UnEx()),
+                                     new T::EseqExp(new T::LabelStm(f),
+                                                    new T::EseqExp(new T::MoveStm(new T::TempExp(r), else_tr.exp->UnEx()), new T::TempExp(r))))));
+      return TR::ExpAndTy(TR::ExExp(ifexp), thenexp.ty);
+    }
+    else
+    {
+      return TR::ExpAndTy(TR::NxExp(ifexp), thenexp.ty);
+    }
+  }
+  else
+  {
+  }
+
+  return TR::ExpAndTy(TR::Exexp(ifexp), thenexp.ty);
 }
 
 TR::ExpAndTy WhileExp::Translate(S::Table<E::EnvEntry> *venv,
