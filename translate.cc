@@ -168,7 +168,11 @@ public:
                                                         new T::EseqExp(new T::MoveStm(new T::TempExp(r), new T::ConstExp(0)),
                                                                        new T::EseqExp(new T::LabelStm(t), new T::TempExp(r))))));
   }
-  T::Stm *UnNx() const override {}
+  T::Stm *UnNx() const override
+  {
+    //don't know it will be called or not
+    return new T::ExpStm(this->UnEx());
+  }
   Cx UnCx() const override
   {
     return this->cx;
@@ -439,33 +443,44 @@ TR::ExpAndTy IfExp::Translate(S::Table<E::EnvEntry> *venv,
   do_patch(test_.trues, t);
   do_patch(test_.falses, f);
 
-  T::Stm *s = condition.exp->UnCx().stm;
-  ((T::CjumpStm *)s)->true_label = t;
-  T::EseqExp *ifexp;
   if (elsee)
   {
+
     TR::ExpAndTy else_tr = this->elsee->Translate(venv, tenv, level, label);
+    TEMP::Label *meeting = TEMP::NewLabel();
+
+    T::EseqExp *ifexp = new T::EseqExp(test_.stm,
+                                       new T::EseqExp(
+                                           new T::LabelStm(t),
+                                           new T::EseqExp(
+                                               new T::MoveStm(new T::TempExp(r), thenexp.exp->UnEx()),
+                                               new T::EseqExp(new T::JumpStm(new T::NameExp(meeting), new TEMP::LabelList(meeting, NULL)),
+                                                              new T::EseqExp(new T::LabelStm(f),
+                                                                             new T::EseqExp(new T::MoveStm(new T::TempExp(r), else_tr.exp->UnEx()),
+                                                                                            new T::EseqExp(new T::LabelStm(meeting),
+                                                                                                           new T::TempExp(r))))))));
     if (else_tr.ty != TY::VoidTy::Instance())
     {
-      ifexp = new T::EseqExp(test_.stm,
-                             new T::EseqExp(
-                                 new T::LabelStm(t),
-                                 new T::EseqExp(
-                                     new T::MoveStm(new T::TempExp(r), thenexp.exp->UnEx()),
-                                     new T::EseqExp(new T::LabelStm(f),
-                                                    new T::EseqExp(new T::MoveStm(new T::TempExp(r), else_tr.exp->UnEx()), new T::TempExp(r))))));
-      return TR::ExpAndTy(TR::ExExp(ifexp), thenexp.ty);
+      return TR::ExpAndTy(new TR::ExExp(ifexp), thenexp.ty);
     }
     else
     {
-      return TR::ExpAndTy(TR::NxExp(ifexp), thenexp.ty);
+      return TR::ExpAndTy(new TR::NxExp(new T::ExpStm(ifexp)), thenexp.ty);
     }
   }
   else
   {
-  }
+    T::SeqStm *ifexp = new T::SeqStm(test_.stm,
+                                     new T::SeqStm(
+                                         new T::LabelStm(t),
+                                         new T::SeqStm(
+                                             thenexp.exp->UnNx(),
+                                             new T::LabelStm(f))));
 
-  return TR::ExpAndTy(TR::Exexp(ifexp), thenexp.ty);
+    return TR::ExpAndTy(new TR::NxExp(ifexp), thenexp.ty);
+  }
+  assert(0);
+  return TR::ExpAndTy(nullptr, TY::VoidTy::Instance());
 }
 
 TR::ExpAndTy WhileExp::Translate(S::Table<E::EnvEntry> *venv,
@@ -473,7 +488,30 @@ TR::ExpAndTy WhileExp::Translate(S::Table<E::EnvEntry> *venv,
                                  TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
-  return TR::ExpAndTy(nullptr, TY::VoidTy::Instance());
+  TEMP::Label *body_label = TEMP::NewLabel();
+  TEMP::Label *done = TEMP::NewLabel();
+
+  TEMP::Label *tst = TEMP::NewLabel();
+
+  TR::ExpAndTy condition = this->test->Translate(venv, tenv, level, label);
+  TR::Cx test_ = condition.exp->UnCx();
+
+  do_patch(test_.trues, body_label);
+  do_patch(test_.falses, done);
+
+  TR::ExpAndTy body_ = this->body->Translate(venv, tenv, level, done);
+
+
+  T::SeqStm *while_exp = new T::SeqStm(new T::LabelStm(tst),
+                                       new T::SeqStm(
+                                           test_.stm, new T::SeqStm(
+                                                          new T::LabelStm(body_label),
+                                                          new T::SeqStm(
+                                                              body_.exp->UnNx(),
+                                                              new T::SeqStm(new T::JumpStm(new T::NameExp(tst), new TEMP::LabelList(tst, NULL)),
+                                                                            new T::LabelStm(done))))));
+
+  return TR::ExpAndTy(new TR::NxExp(while_exp), TY::VoidTy::Instance());
 }
 
 TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
@@ -481,15 +519,36 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
                                TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
+
+  E::VarEntry *iterator = new E::VarEntry(TY::IntTy::Instance(), true);
+
+  venv->BeginScope();
+  venv->Enter(var, iterator);
+
+  TEMP::Label *inc_iter_label = TEMP::NewLabel();
+  TEMP::Label *body_label = TEMP::NewLabel();
+  TEMP::Label *done = TEMP::NewLabel();
+  TR::Access *iter_access = TR::Access::AllocLocal(level, this->escape);
+  //this->var
+  TR::ExpAndTy low = this->lo->Translate(venv, tenv, level, label);
+  TR::ExpAndTy high = this->hi->Translate(venv, tenv, level, label);
+  TR::ExpAndTy body_ = this->body->Translate(venv, tenv, level, done);
+
+
+
+
+
+  venv->EndScope();
   return TR::ExpAndTy(nullptr, TY::VoidTy::Instance());
 }
 
 TR::ExpAndTy BreakExp::Translate(S::Table<E::EnvEntry> *venv,
                                  S::Table<TY::Ty> *tenv, TR::Level *level,
-                                 TEMP::Label *label) const
+                                 TEMP::Label *done) const
 {
   // TODO: Put your codes here (lab5).
-  return TR::ExpAndTy(nullptr, TY::VoidTy::Instance());
+  T::JumpStm *breakexp =  new T::JumpStm(new T::NameExp(done), new TEMP::LabelList(done, NULL)) ;
+  return TR::ExpAndTy(new TR::NxExp(breakexp), TY::VoidTy::Instance());
 }
 
 TR::ExpAndTy LetExp::Translate(S::Table<E::EnvEntry> *venv,
