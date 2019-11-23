@@ -20,6 +20,11 @@ public:
   T::StmList view_shift;
   int s_offset; //Which is commonly a minus number.
 };
+TEMP::Temp *F_FP(void);
+TEMP::Temp *F_SP(void);
+TEMP::Temp *F_ZERO(void);
+TEMP::Temp *F_RA(void);
+TEMP::Temp *F_RV(void);
 
 class Access
 {
@@ -41,22 +46,22 @@ public:
 class RegAccess : public Access
 {
 public:
-  int offset;
+  TEMP::Temp* reg;
 
   T::Exp *ToExp(T::Exp *framePtr)
   {
-    return nullptr;
+    return new T::TempExp(this->reg);
   }
 };
 
 class FrameAccess : public Access
 {
 public:
-  TEMP::Temp reg;
+  int offset;
 
   T::Exp *ToExp(T::Exp *framePtr)
   {
-    return nullptr;
+    return new T::MemExp(new T::BinopExp(T::PLUS_OP, framePtr,new T::ConstExp(this->offset)));
   }
 };
 class AccessList
@@ -118,6 +123,7 @@ T::Stm *F_procEntryExit1(Frame *frame, T::Stm *stm);
 
 AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst);
 AS::InstrList *F_procEntryExit2(AS::InstrList *body);
+F::Access *F_allocLocal(Frame *frame, bool escape);
 } // namespace F
 
 #endif

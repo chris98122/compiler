@@ -20,6 +20,7 @@ void addfrag(F::Frag *frag)
 {
   frags = new F::FragList(frag, frags);
 }
+
 class Access
 {
 public:
@@ -27,11 +28,7 @@ public:
   F::Access *access;
 
   Access(Level *level, F::Access *access) : level(level), access(access) {}
-  static Access *AllocLocal(Level *level, bool escape)
-  {
-
-    return nullptr;
-  }
+  static Access *AllocLocal(Level *level, bool escape);
 };
 
 class AccessList
@@ -55,7 +52,10 @@ public:
   static Level *NewLevel(Level *parent, TEMP::Label *name,
                          U::BoolList *formals);
 };
-
+Access *Access::AllocLocal(Level *level, bool escape)
+{
+  return new Access(level, F::F_allocLocal(level->frame, escape));
+}
 class PatchList
 {
 public:
@@ -501,7 +501,6 @@ TR::ExpAndTy WhileExp::Translate(S::Table<E::EnvEntry> *venv,
 
   TR::ExpAndTy body_ = this->body->Translate(venv, tenv, level, done);
 
-
   T::SeqStm *while_exp = new T::SeqStm(new T::LabelStm(tst),
                                        new T::SeqStm(
                                            test_.stm, new T::SeqStm(
@@ -534,9 +533,9 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
   TR::ExpAndTy high = this->hi->Translate(venv, tenv, level, label);
   TR::ExpAndTy body_ = this->body->Translate(venv, tenv, level, done);
 
-
-
-
+  T::Exp *loopvar =   iter_access->access->ToExp(new T::TempExp(F::F_FP())) ;
+  T::MoveStm *incloop = new T::MoveStm(loopvar,
+                                       new T::BinopExp(T::PLUS_OP, loopvar, new T::ConstExp(1)));
 
   venv->EndScope();
   return TR::ExpAndTy(nullptr, TY::VoidTy::Instance());
@@ -547,7 +546,7 @@ TR::ExpAndTy BreakExp::Translate(S::Table<E::EnvEntry> *venv,
                                  TEMP::Label *done) const
 {
   // TODO: Put your codes here (lab5).
-  T::JumpStm *breakexp =  new T::JumpStm(new T::NameExp(done), new TEMP::LabelList(done, NULL)) ;
+  T::JumpStm *breakexp = new T::JumpStm(new T::NameExp(done), new TEMP::LabelList(done, NULL));
   return TR::ExpAndTy(new TR::NxExp(breakexp), TY::VoidTy::Instance());
 }
 
