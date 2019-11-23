@@ -376,7 +376,7 @@ TR::ExpAndTy RecordExp::Translate(S::Table<E::EnvEntry> *venv,
   return TR::ExpAndTy(nullptr, record);
 }
 
-TR::ExExp* Tr_Seq(TR::Exp *left,TR::Exp *right)
+TR::ExExp *Tr_Seq(TR::Exp *left, TR::Exp *right)
 {
   /*Don't handle the situation where left is NULL*/
   T::EseqExp *e;
@@ -415,7 +415,11 @@ TR::ExpAndTy AssignExp::Translate(S::Table<E::EnvEntry> *venv,
                                   TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
-  return TR::ExpAndTy(nullptr, TY::VoidTy::Instance());
+
+  TR::ExpAndTy leftvalue = this->var->Translate(venv, tenv, level, label);
+  TR::ExpAndTy right = this->exp->Translate(venv, tenv, level, label);
+  TR::NxExp *assignexp = new TR::NxExp(new T::MoveStm(leftvalue.exp->UnEx(), right.exp->UnEx()));
+  return TR::ExpAndTy(assignexp, TY::VoidTy::Instance());
 }
 
 TR::ExpAndTy IfExp::Translate(S::Table<E::EnvEntry> *venv,
@@ -423,6 +427,9 @@ TR::ExpAndTy IfExp::Translate(S::Table<E::EnvEntry> *venv,
                               TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
+  TR::ExpAndTy condition = this->test->Translate(venv, tenv, level, label);
+  TR::ExpAndTy then_type = this->then->Translate(venv, tenv, level, label);
+
   return TR::ExpAndTy(nullptr, TY::VoidTy::Instance());
 }
 
