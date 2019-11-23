@@ -234,12 +234,10 @@ TR::ExpAndTy FieldVar::Translate(S::Table<E::EnvEntry> *venv,
   E::EnvEntry *var;
   if (this->var->kind == SIMPLE)
   {
-    //check if var is a record
     var = venv->Look(((SimpleVar *)this->var)->sym);
   }
   if (this->var->kind == FIELD)
   {
-    //check if var is a record
     var = venv->Look(((FieldVar *)this->var)->sym);
   }
 
@@ -524,7 +522,7 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
   venv->BeginScope();
   venv->Enter(var, iterator);
 
-  TEMP::Label *inc_iter_label = TEMP::NewLabel();
+  TEMP::Label *incloop_label = TEMP::NewLabel();
   TEMP::Label *body_label = TEMP::NewLabel();
   TEMP::Label *done = TEMP::NewLabel();
   TR::Access *iter_access = TR::Access::AllocLocal(level, this->escape);
@@ -532,13 +530,25 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
   TR::ExpAndTy low = this->lo->Translate(venv, tenv, level, label);
   TR::ExpAndTy high = this->hi->Translate(venv, tenv, level, label);
   TR::ExpAndTy body_ = this->body->Translate(venv, tenv, level, done);
-
-  T::Exp *loopvar =   iter_access->access->ToExp(new T::TempExp(F::F_FP())) ;
+  venv->EndScope();
+  //i++
+  T::Exp *loopvar = iter_access->access->ToExp(new T::TempExp(F::F_FP()));
   T::MoveStm *incloop = new T::MoveStm(loopvar,
                                        new T::BinopExp(T::PLUS_OP, loopvar, new T::ConstExp(1)));
 
-  venv->EndScope();
-  return TR::ExpAndTy(nullptr, TY::VoidTy::Instance());
+  /*if(i < hi) {i++; goto body;}*/
+  T::SeqStm *test = new T::SeqStm(new T::CjumpStm(T::LE_OP, loopvar, high.exp->UnEx(), incloop_label, done),
+                                  new T::SeqStm(new T::LabelStm(incloop_label),
+                                                new T::SeqStm(incloop,
+                                                              new T::JumpStm(new T::NameExp(body_label), new TEMP::LabelList(body_label, NULL)))));
+
+  T::CjumpStm *checklohi = new T::CjumpStm(T::LE_OP, low.exp->UnEx(), high.exp->UnEx(), body_label, done);
+
+  T::SeqStm *for_exp = new T::SeqStm(checklohi,
+                                     new T::SeqStm(new T::LabelStm(body_label),
+                                                   new T::SeqStm(body_.exp->UnNx(),
+                                                                 new T::SeqStm(test, new T::LabelStm(done)))));
+  return TR::ExpAndTy(new TR::NxExp(for_exp), TY::VoidTy::Instance());
 }
 
 TR::ExpAndTy BreakExp::Translate(S::Table<E::EnvEntry> *venv,
@@ -599,19 +609,47 @@ TR::Exp *TypeDec::Translate(S::Table<E::EnvEntry> *venv, S::Table<TY::Ty> *tenv,
 TY::Ty *NameTy::Translate(S::Table<TY::Ty> *tenv) const
 {
   // TODO: Put your codes here (lab5).
+   TY::Ty *value_type = tenv->Look(this->name);
+
+  if (value_type)
+  {
+    if (value_type->kind == TY::Ty::NAME)
+    {
+      TY::NameTy *name_ty;
+      name_ty = (TY::NameTy *)tenv->Look(((TY::NameTy *)value_type)->sym);
+      while (name_ty && name_ty->kind == TY::Ty::NAME)
+      { 
+        name_ty = (TY::NameTy *)tenv->Look(name_ty->sym);
+      }
+    }
+    else
+      return value_type;
+  }
+  assert(0);
   return TY::VoidTy::Instance();
 }
 
+static TY::FieldList *make_fieldlist(S::Table<TY::Ty> *tenv, A::FieldList *fields)
+{
+  if (fields == nullptr)
+  {
+    return nullptr;
+  }
+  TY::Ty *ty = tenv->Look(fields->head->typ);
+  return new TY::FieldList(new TY::Field(fields->head->name, ty),
+                           make_fieldlist(tenv, fields->tail));
+}
 TY::Ty *RecordTy::Translate(S::Table<TY::Ty> *tenv) const
 {
   // TODO: Put your codes here (lab5).
-  return TY::VoidTy::Instance();
+  TY::FieldList *f = make_fieldlist(tenv, this->record);
+  return new TY::RecordTy(f);
 }
-
 TY::Ty *ArrayTy::Translate(S::Table<TY::Ty> *tenv) const
 {
-  // TODO: Put your codes here (lab5).
-  return TY::VoidTy::Instance();
+  TY::Ty *value_type = tenv->Look(this->array);
+  if (value_type)
+    return new TY::ArrayTy(value_type);
 }
 
 } // namespace A
