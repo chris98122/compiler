@@ -29,8 +29,11 @@ TEMP::Temp *F_ZERO(void)
 TEMP::Temp *F_RA(void)
 {
 }
-TEMP::Temp *F_RV(void)
+TEMP::Temp *F_RV(void) //return value of the callee
 {
+  if (!rax)
+    rax = TEMP::Temp::NewTemp();
+  return rax;
 }
 
 TEMP::Temp *F_RDI()
@@ -83,27 +86,31 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
   TEMP::Temp *temp = TEMP::Temp::NewTemp();
 
   int formal_off = wordsize; // The seventh arg was located at 8(%rbp)
-  int num = 1;               //Marks the sequence of the formals.
-                             /*If the formal is escape, then allocate it on the frame.
+  /*If the formal is escape, then allocate it on the frame.
 	  Else,allocate it on the temp.*/
   X64Frame *newframe = new X64Frame(name, NULL, NULL, NULL, 0);
 
+  int num = 0;
   for (; escapes; escapes = escapes->tail, num++)
   {
     escape = escapes->head;
     if (escape)
     {
-      v_tail->tail = new T::StmList(new T::MoveStm(
-                                        new T::MemExp(
-                                            new T::BinopExp(
-                                                T::PLUS_OP, new T::TempExp(F::F_FP()), new T::ConstExp(newframe->s_offset))),
-                                        new T::TempExp(F_RDI())),
-                                    NULL);
-      newframe->s_offset -= wordsize;
-      f_tail->tail = new AccessList(new F::InFrameAccess(newframe->s_offset), NULL);
-      f_tail = f_tail->tail;
-      v_tail = v_tail->tail;
-      break;
+      switch (num)
+      {
+      case 0:
+        v_tail->tail = new T::StmList(new T::MoveStm(
+                                          new T::MemExp(
+                                              new T::BinopExp(
+                                                  T::PLUS_OP, new T::TempExp(F::F_FP()), new T::ConstExp(newframe->s_offset))),
+                                          new T::TempExp(F_RDI())),
+                                      NULL);
+        newframe->s_offset -= wordsize;
+        f_tail->tail = new AccessList(new F::InFrameAccess(newframe->s_offset), NULL);
+        f_tail = f_tail->tail;
+        v_tail = v_tail->tail;
+        break;
+      }
     }
     else
     {
@@ -120,8 +127,14 @@ T::Exp *InRegAccess ::ToExp(T::Exp *framePtr) const
   return new T::TempExp(this->reg);
 }
 
-T::Stm *F_procEntryExit1(Frame *frame, T::Stm *stm)
+T::Stm  *F_procEntryExit1(Frame *frame, T::Stm *stm)
 {
+  T::StmList *iter = frame->view_shift;
+  while (iter->tail)
+  {
+
+    iter = iter->tail;
+  } 
   return nullptr;
 }
 

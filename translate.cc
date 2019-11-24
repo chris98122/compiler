@@ -199,7 +199,7 @@ Level *Outermost()
   return lv;
 }
 
-void  procEntryExit(Level *level, TR::Exp *func_body);
+void procEntryExit(Level *level, TR::Exp *func_body);
 F::FragList *TranslateProgram(A::Exp *root)
 {
   // TODO: Put your codes here (lab5).
@@ -218,11 +218,14 @@ void procEntryExit(Level *level, TR::Exp *func_body)
 {
   // pack F_procEntryExit1,2,3
 
-  // T_stm stm = T_Move(T_Temp(F_RV()), Tr_unEx(func_body));//STORE func return value
-  
-  // stm = F_procEntryExit1(level->frame, stm);
+  T::MoveStm *adden = new T::MoveStm(new T::TempExp(F::F_RV()), func_body->UnEx()); //STORE func return value
+
+  T::Stm  *stm = F_procEntryExit1(level->frame, adden);
+
+  F::ProcFrag *head = new F::ProcFrag(stm, level->frame);
   // F_frag head = F_ProcFrag(stm, level->frame);
-  // //The added frag is the head of the new frags.
+
+  // The added frag is the head of the new frags.
   // fragtail->tail = F_FragList(head, NULL);
   // fragtail = fragtail->tail;
 }
@@ -266,27 +269,27 @@ TR::ExpAndTy FieldVar::Translate(S::Table<E::EnvEntry> *venv,
                                  TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
-  E::EnvEntry *var;
-  if (this->var->kind == SIMPLE)
-  {
-    var = venv->Look(((SimpleVar *)this->var)->sym);
-  }
-  if (this->var->kind == FIELD)
-  {
-    var = venv->Look(((FieldVar *)this->var)->sym);
-  }
+  // get type symbol field num
+  int order = 0;
 
-  // get type symbol fields
   TY::FieldList *f = ((TY::RecordTy *)((E::VarEntry *)var)->ty)->fields;
   while (f && f->head)
   {
     if (!strcmp(f->head->name->Name().c_str(), this->sym->Name().c_str()))
-      return TR::ExpAndTy(nullptr, f->head->ty);
+    {
+      break;
+    }
     f = f->tail;
+    order++;
   }
-  // wrong  to do
-  TR::ExExp *exexp = new TR::ExExp(new T::TempExp(TEMP::Temp::NewTemp()));
-  return TR::ExpAndTy(exexp, TY::VoidTy::Instance());
+  // get the record var access
+  TR::ExpAndTy var_exp_ty = this->var->Translate(venv, tenv, level, label);
+
+  TR::ExExp * frame = ( TR::ExExp *)(var_exp_ty.exp);
+  T::MemExp * res = new T::MemExp(new T::BinopExp(T::PLUS_OP, frame->UnEx(), new T::ConstExp(order * wordsize))); //static link is the first escaped arg;
+ 
+
+  return TR::ExpAndTy(new TR::ExExp(res), var_exp_ty.ty);
 }
 
 TR::ExpAndTy SubscriptVar::Translate(S::Table<E::EnvEntry> *venv,
