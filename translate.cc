@@ -195,7 +195,7 @@ Level *Outermost()
   if (lv != nullptr)
     return lv;
 
-  lv = new Level(nullptr, nullptr);
+  lv = new Level(F::F_newFrame(TEMP::NamedLabel("main"),nullptr), nullptr); 
   return lv;
 }
 F::FragList *TranslateProgram(A::Exp *root)
@@ -209,6 +209,18 @@ F::FragList *TranslateProgram(A::Exp *root)
   return frags;
 }
 
+Level *Level::NewLevel(Level *parent, TEMP::Label *name,
+                       U::BoolList *formals)
+{
+  return nullptr;
+  TR::Level *level  = new Level(nullptr, parent);
+  U::BoolList *link_added_formals = new U::BoolList(true, formals);
+  // F_frame frame = F_newFrame(name, link_added_formals);
+  // level->frame = frame;
+  // level->parent = parent;
+  return level;
+}
+
 } // namespace TR
 
 namespace A
@@ -219,11 +231,17 @@ TR::ExpAndTy SimpleVar::Translate(S::Table<E::EnvEntry> *venv,
                                   TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
-  // wrong  to do
-  E::EnvEntry *value = venv->Look(this->sym);
+  E::EnvEntry *entry = venv->Look(((SimpleVar *)this)->sym);
+  TR::Access *access = ((E::VarEntry *)entry)->access;
+  T::Exp *frame = new T::TempExp(F::F_FP());
+  while (level != access->level)
+  {
+    frame = new T::MemExp(new T::BinopExp(T::PLUS_OP, frame, new T::ConstExp(-wordsize))); //static link is the first escaped arg;
+    level = level->parent;
+  }
+  T::Exp *var_exp = access->access->ToExp(frame);
 
-  TR::ExExp *exexp = new TR::ExExp(new T::TempExp(TEMP::Temp::NewTemp()));
-  return TR::ExpAndTy(exexp, ((E::VarEntry *)value)->ty);
+  return TR::ExpAndTy(new TR::ExExp(var_exp), ((E::VarEntry *)entry)->ty);
 }
 
 TR::ExpAndTy FieldVar::Translate(S::Table<E::EnvEntry> *venv,
@@ -517,16 +535,15 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
 {
   // TODO: Put your codes here (lab5).
 
-  E::VarEntry *iterator = new E::VarEntry(TY::IntTy::Instance(), true);
-
-  venv->BeginScope();
-  venv->Enter(var, iterator);
-
   TEMP::Label *incloop_label = TEMP::NewLabel();
   TEMP::Label *body_label = TEMP::NewLabel();
   TEMP::Label *done = TEMP::NewLabel();
   TR::Access *iter_access = TR::Access::AllocLocal(level, this->escape);
-  //this->var
+  //VarEntry
+
+  venv->BeginScope();
+  E::VarEntry *iterator = new E::VarEntry(iter_access, TY::IntTy::Instance(), true);
+  venv->Enter(var, iterator);
   TR::ExpAndTy low = this->lo->Translate(venv, tenv, level, label);
   TR::ExpAndTy high = this->hi->Translate(venv, tenv, level, label);
   TR::ExpAndTy body_ = this->body->Translate(venv, tenv, level, done);
@@ -589,6 +606,7 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
                                 TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
+  //Assume that all params are escaped.
   return nullptr;
 }
 
@@ -609,7 +627,7 @@ TR::Exp *TypeDec::Translate(S::Table<E::EnvEntry> *venv, S::Table<TY::Ty> *tenv,
 TY::Ty *NameTy::Translate(S::Table<TY::Ty> *tenv) const
 {
   // TODO: Put your codes here (lab5).
-   TY::Ty *value_type = tenv->Look(this->name);
+  TY::Ty *value_type = tenv->Look(this->name);
 
   if (value_type)
   {
@@ -618,7 +636,7 @@ TY::Ty *NameTy::Translate(S::Table<TY::Ty> *tenv) const
       TY::NameTy *name_ty;
       name_ty = (TY::NameTy *)tenv->Look(((TY::NameTy *)value_type)->sym);
       while (name_ty && name_ty->kind == TY::Ty::NAME)
-      { 
+      {
         name_ty = (TY::NameTy *)tenv->Look(name_ty->sym);
       }
     }

@@ -7,6 +7,9 @@
 #include "tiger/util/util.h"
 
 #include "tiger/codegen/assem.h"
+
+static const int wordsize = 8;
+
 namespace F
 {
 class AccessList;
@@ -17,9 +20,17 @@ public:
   TEMP::Label *label;
   F::AccessList *formals;
   F::AccessList *locals;
-  T::StmList view_shift;
+  T::StmList *view_shift;
   int s_offset; //Which is commonly a minus number.
+  Frame(TEMP::Label *label,
+        F::AccessList *formals,
+        F::AccessList *locals,
+        T::StmList *view_shift, int s_offset)
+      : label(label), formals(formals), locals(locals), view_shift(view_shift), s_offset(s_offset) {}
 };
+
+Frame *F_newFrame(TEMP::Label *name, U::BoolList *escape);
+
 TEMP::Temp *F_FP(void);
 TEMP::Temp *F_SP(void);
 TEMP::Temp *F_ZERO(void);
@@ -43,27 +54,6 @@ public:
   virtual T::Exp *ToExp(T::Exp *framePtr) const = 0;
 };
 
-class RegAccess : public Access
-{
-public:
-  TEMP::Temp* reg;
-
-  T::Exp *ToExp(T::Exp *framePtr)
-  {
-    return new T::TempExp(this->reg);
-  }
-};
-
-class FrameAccess : public Access
-{
-public:
-  int offset;
-
-  T::Exp *ToExp(T::Exp *framePtr)
-  {
-    return new T::MemExp(new T::BinopExp(T::PLUS_OP, framePtr,new T::ConstExp(this->offset)));
-  }
-};
 class AccessList
 {
 public:
