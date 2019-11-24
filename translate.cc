@@ -195,25 +195,42 @@ Level *Outermost()
   if (lv != nullptr)
     return lv;
 
-  lv = new Level(F::F_newFrame(TEMP::NamedLabel("main"),nullptr), nullptr); 
+  lv = new Level(F::F_newFrame(TEMP::NamedLabel("main"), nullptr), nullptr);
   return lv;
 }
+
+void  procEntryExit(Level *level, TR::Exp *func_body);
 F::FragList *TranslateProgram(A::Exp *root)
 {
   // TODO: Put your codes here (lab5).
 
+  TR::Level *main_level = Outermost();
+
   F::FragList *frags = new F::FragList(nullptr, nullptr);
-  TR::ExpAndTy exp_and_ty = root->Translate(E::BaseVEnv(), E::BaseTEnv(), Outermost(), nullptr);
-  TR::Exp *body = exp_and_ty.exp;
-  T::Stm *stm = F::F_procEntryExit1(nullptr, body->UnNx());
-  return frags;
+  TR::ExpAndTy mainexp = root->Translate(E::BaseVEnv(), E::BaseTEnv(), main_level, nullptr);
+
+  TR::procEntryExit(main_level, mainexp.exp);
+
+  return frags->tail;
 }
 
+void procEntryExit(Level *level, TR::Exp *func_body)
+{
+  // pack F_procEntryExit1,2,3
+
+  // T_stm stm = T_Move(T_Temp(F_RV()), Tr_unEx(func_body));//STORE func return value
+  
+  // stm = F_procEntryExit1(level->frame, stm);
+  // F_frag head = F_ProcFrag(stm, level->frame);
+  // //The added frag is the head of the new frags.
+  // fragtail->tail = F_FragList(head, NULL);
+  // fragtail = fragtail->tail;
+}
 Level *Level::NewLevel(Level *parent, TEMP::Label *name,
                        U::BoolList *formals)
 {
   return nullptr;
-  TR::Level *level  = new Level(nullptr, parent);
+  TR::Level *level = new Level(nullptr, parent);
   U::BoolList *link_added_formals = new U::BoolList(true, formals);
   // F_frame frame = F_newFrame(name, link_added_formals);
   // level->frame = frame;
