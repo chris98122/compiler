@@ -127,15 +127,16 @@ T::Exp *InRegAccess ::ToExp(T::Exp *framePtr) const
   return new T::TempExp(this->reg);
 }
 
-T::Stm  *F_procEntryExit1(Frame *frame, T::Stm *stm)
+T::Stm *F_procEntryExit1(Frame *frame, T::Stm *stm)
 {
   T::StmList *iter = frame->view_shift;
-  while (iter->tail)
+  T::SeqStm *res;
+  while (iter && iter->head)
   {
-
+    res = new T::SeqStm(iter->head, res);
     iter = iter->tail;
-  } 
-  return nullptr;
+  }
+  return res;
 }
 
 AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst)
@@ -163,5 +164,10 @@ F::Access *F_allocLocal(Frame *frame, bool escape)
     local = new F::InRegAccess(TEMP::Temp::NewTemp());
   }
   return local;
+}
+
+T::CallExp *F_externalCall(std::string s, T::ExpList *args)
+{
+  return new T::CallExp(new T::NameExp(TEMP::NamedLabel(s)), args);
 }
 } // namespace F

@@ -220,24 +220,19 @@ void procEntryExit(Level *level, TR::Exp *func_body)
 
   T::MoveStm *adden = new T::MoveStm(new T::TempExp(F::F_RV()), func_body->UnEx()); //STORE func return value
 
-  T::Stm  *stm = F_procEntryExit1(level->frame, adden);
+  T::Stm *stm = F_procEntryExit1(level->frame, adden);
 
   F::ProcFrag *head = new F::ProcFrag(stm, level->frame);
-  // F_frag head = F_ProcFrag(stm, level->frame);
-
+  addfrag(head);
   // The added frag is the head of the new frags.
-  // fragtail->tail = F_FragList(head, NULL);
-  // fragtail = fragtail->tail;
 }
 Level *Level::NewLevel(Level *parent, TEMP::Label *name,
                        U::BoolList *formals)
 {
-  return nullptr;
-  TR::Level *level = new Level(nullptr, parent);
+  // make all formals escape
   U::BoolList *link_added_formals = new U::BoolList(true, formals);
-  // F_frame frame = F_newFrame(name, link_added_formals);
-  // level->frame = frame;
-  // level->parent = parent;
+  F::Frame *frame = F::F_newFrame(name, link_added_formals);
+  TR::Level *level = new Level(frame, parent);
   return level;
 }
 
@@ -259,9 +254,9 @@ TR::ExpAndTy SimpleVar::Translate(S::Table<E::EnvEntry> *venv,
     frame = new T::MemExp(new T::BinopExp(T::PLUS_OP, frame, new T::ConstExp(-wordsize))); //static link is the first escaped arg;
     level = level->parent;
   }
-  T::Exp *var_exp = access->access->ToExp(frame);
+  T::Exp *var_mem = access->access->ToExp(frame);
 
-  return TR::ExpAndTy(new TR::ExExp(var_exp), ((E::VarEntry *)entry)->ty);
+  return TR::ExpAndTy(new TR::ExExp(var_mem), ((E::VarEntry *)entry)->ty);
 }
 
 TR::ExpAndTy FieldVar::Translate(S::Table<E::EnvEntry> *venv,
@@ -285,11 +280,10 @@ TR::ExpAndTy FieldVar::Translate(S::Table<E::EnvEntry> *venv,
   // get the record var access
   TR::ExpAndTy var_exp_ty = this->var->Translate(venv, tenv, level, label);
 
-  TR::ExExp * frame = ( TR::ExExp *)(var_exp_ty.exp);
-  T::MemExp * res = new T::MemExp(new T::BinopExp(T::PLUS_OP, frame->UnEx(), new T::ConstExp(order * wordsize))); //static link is the first escaped arg;
- 
+  TR::ExExp *frame = (TR::ExExp *)(var_exp_ty.exp);
+  T::MemExp *fieldvar_mem = new T::MemExp(new T::BinopExp(T::PLUS_OP, frame->UnEx(), new T::ConstExp(order * wordsize))); //static link is the first escaped arg;
 
-  return TR::ExpAndTy(new TR::ExExp(res), var_exp_ty.ty);
+  return TR::ExpAndTy(new TR::ExExp(fieldvar_mem), var_exp_ty.ty);
 }
 
 TR::ExpAndTy SubscriptVar::Translate(S::Table<E::EnvEntry> *venv,
@@ -297,12 +291,16 @@ TR::ExpAndTy SubscriptVar::Translate(S::Table<E::EnvEntry> *venv,
                                      TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
-  E::EnvEntry *var = venv->Look(((SimpleVar *)this->var)->sym);
-  TY::Ty *vartype = ((E::VarEntry *)var)->ty;
 
-  TR::ExExp *exexp = new TR::ExExp(new T::TempExp(TEMP::Temp::NewTemp()));
+  TR::ExpAndTy var_exp_ty = this->var->Translate(venv, tenv, level, label);
+  TR::ExpAndTy subscript_exp_ty = this->subscript->Translate(venv, tenv, level, label);
+
+  TR::ExExp *frame = (TR::ExExp *)(var_exp_ty.exp);
+  T::MemExp *subvar_mem = new T::MemExp(new T::BinopExp(T::PLUS_OP, frame->UnEx(),
+                                                        new T::BinopExp(T::MUL_OP, subscript_exp_ty.exp->UnEx(), new T::ConstExp(wordsize)))); //static link is the first escaped arg;
+
   // wrong  to do
-  return TR::ExpAndTy(exexp, vartype);
+  return TR::ExpAndTy(new TR::ExExp(subvar_mem), var_exp_ty.ty);
 }
 
 TR::ExpAndTy VarExp::Translate(S::Table<E::EnvEntry> *venv,
@@ -610,7 +608,15 @@ TR::ExpAndTy ArrayExp::Translate(S::Table<E::EnvEntry> *venv,
                                  TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
-  return TR::ExpAndTy(nullptr, TY::VoidTy::Instance());
+  TY::Ty *value_type = tenv->Look(this->typ);
+
+  TR::ExpAndTy size_exp = this->size->Translate(venv, tenv, level, label);
+  TR::ExpAndTy init_exp = this->init->Translate(venv, tenv, level, label);
+
+  T::Exp *callinitArray = F::F_externalCall("initArray",
+                                            new T::ExpList(size_exp.exp->UnEx(),
+                                                           new T::ExpList(init_exp.exp->UnEx(), NULL)));
+  return TR::ExpAndTy(new TR::ExExp(callinitArray), value_type);
 }
 
 TR::ExpAndTy VoidExp::Translate(S::Table<E::EnvEntry> *venv,
