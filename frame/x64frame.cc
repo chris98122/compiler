@@ -17,7 +17,7 @@ static TEMP::Temp *r9 = NULL;
 TEMP::Temp *F_FP(void)
 {
   if (!rbp)
-    rbp = TEMP::Temp::NewTemp();
+    rbp = TEMP::Temp::NewTemp(); 
   return rbp;
 }
 TEMP::Temp *F_SP(void)
@@ -41,6 +41,13 @@ TEMP::Temp *F_RDI()
   if (!rdi)
     rdi = TEMP::Temp::NewTemp();
   return rdi;
+}
+
+TEMP::Temp *F_RSI()
+{
+  if (!rsi)
+    rsi = TEMP::Temp::NewTemp();
+  return rsi;
 }
 class X64Frame : public Frame
 {
@@ -90,7 +97,7 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
 	  Else,allocate it on the temp.*/
   X64Frame *newframe = new X64Frame(name, NULL, NULL, NULL, 0);
 
-  int num = 0;
+  int num = 1;//the num of formals
   for (; escapes; escapes = escapes->tail, num++)
   {
     escape = escapes->head;
@@ -98,12 +105,24 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
     {
       switch (num)
       {
-      case 0:
+      case 1:
         v_tail->tail = new T::StmList(new T::MoveStm(
                                           new T::MemExp(
                                               new T::BinopExp(
                                                   T::PLUS_OP, new T::TempExp(F::F_FP()), new T::ConstExp(newframe->s_offset))),
                                           new T::TempExp(F_RDI())),
+                                      NULL);
+        newframe->s_offset -= wordsize;
+        f_tail->tail = new AccessList(new F::InFrameAccess(newframe->s_offset), NULL);
+        f_tail = f_tail->tail;
+        v_tail = v_tail->tail;
+        break;
+      case 2:
+              v_tail->tail = new T::StmList(new T::MoveStm(
+                                          new T::MemExp(
+                                              new T::BinopExp(
+                                                  T::PLUS_OP, new T::TempExp(F::F_FP()), new T::ConstExp(newframe->s_offset))),
+                                          new T::TempExp(F_RSI())),
                                       NULL);
         newframe->s_offset -= wordsize;
         f_tail->tail = new AccessList(new F::InFrameAccess(newframe->s_offset), NULL);

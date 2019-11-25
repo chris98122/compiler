@@ -114,6 +114,9 @@ T::Stm *F_procEntryExit1(Frame *frame, T::Stm *stm);
 AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst);
 AS::InstrList *F_procEntryExit2(AS::InstrList *body);
 F::Access *F_allocLocal(Frame *frame, bool escape);
+
+T::CallExp *F_externalCall(std::string s,T::ExpList *args);
+
 } // namespace F
 
 #endif
