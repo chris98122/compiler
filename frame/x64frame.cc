@@ -13,7 +13,8 @@ static TEMP::Temp *rdx = NULL;
 static TEMP::Temp *rcx = NULL;
 static TEMP::Temp *r8 = NULL;
 static TEMP::Temp *r9 = NULL;
-
+static TEMP::Temp *rsp = NULL;
+static TEMP::Temp *rbx = NULL;
 TEMP::Temp *F_FP(void)
 {
   if (!rbp)
@@ -22,6 +23,9 @@ TEMP::Temp *F_FP(void)
 }
 TEMP::Temp *F_SP(void)
 {
+  if (!rsp)
+    rsp = TEMP::Temp::NewTemp();
+  return rsp;
 }
 TEMP::Temp *F_ZERO(void)
 {
@@ -72,7 +76,12 @@ TEMP::Temp *F_R9()
     r9 = TEMP::Temp::NewTemp();
   return r9;
 }
-
+TEMP::Temp *F_RBX()
+{
+  if (!rbx)
+    rbx = TEMP::Temp::NewTemp();
+  return rbx;
+}
 class X64Frame : public Frame
 {
 public:
@@ -201,12 +210,12 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
         break;
-      	default:
-				{
-					f_tail->tail =  new AccessList(new F::InFrameAccess(formal_off),NULL);//sequence of formals here is reversed.
-					f_tail = f_tail->tail;
-					formal_off += wordsize;
-				}
+      default:
+      {
+        f_tail->tail = new AccessList(new F::InFrameAccess(formal_off), NULL); //sequence of formals here is reversed.
+        f_tail = f_tail->tail;
+        formal_off += wordsize;
+      }
       }
     }
     else
@@ -238,13 +247,23 @@ T::Stm *F_procEntryExit1(Frame *frame, T::Stm *stm)
 
 AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst)
 {
-  return nullptr;
+  char prolog[256];
+  sprintf(prolog, "# exit3\n"
+                  "push %%rbp\n"
+                  "movl %%rsp, %%rbp\n"
+                  "subl $%d, %%rsp\n",
+          abs(frame->s_offset));
+  char *epilog = "leave\nret\n";
+  return new AS::Proc(std::string(prolog), inst, epilog);
 }
 
 AS::InstrList *F_procEntryExit2(AS::InstrList *body)
 {
 
-  return nullptr;
+  static TEMP::TempList *returnSink = NULL;
+  if (!returnSink)
+    returnSink = new TEMP::TempList(rsp, new TEMP::TempList(F::F_FP(), NULL));
+  return AS::InstrList::Splice(body, new AS::InstrList(new AS::OperInstr("#exit2", NULL, returnSink, NULL), NULL));
 }
 
 F::Access *F_allocLocal(Frame *frame, bool escape)
@@ -257,7 +276,6 @@ F::Access *F_allocLocal(Frame *frame, bool escape)
   }
   else
   {
-
     local = new F::InRegAccess(TEMP::Temp::NewTemp());
   }
   return local;

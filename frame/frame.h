@@ -12,6 +12,26 @@ static const int wordsize = 8;
 
 namespace F
 {
+
+TEMP::Temp *F_FP(void);
+TEMP::Temp *F_RV(void);
+TEMP::Temp *F_RAX(void);
+TEMP::Temp *F_RDI();
+TEMP::Temp *F_RSI();
+TEMP::Temp *F_RDX();
+TEMP::Temp *F_RCX();
+TEMP::Temp *F_R8();
+TEMP::Temp *F_R9();
+TEMP::Temp *F_RBX();
+TEMP::Temp *F_RBP();
+TEMP::Temp *F_R10();
+TEMP::Temp *F_R11();
+TEMP::Temp *F_R12();
+TEMP::Temp *F_R13();
+TEMP::Temp *F_R14();
+TEMP::Temp *F_R15();
+TEMP::Temp *F_SP();
+
 class AccessList;
 class Frame
 {
@@ -20,7 +40,7 @@ public:
   TEMP::Label *label;
   F::AccessList *formals;
   F::AccessList *locals;
-  T::StmList *view_shift;
+  T::StmList *view_shift; 
   int s_offset; //Which is commonly a minus number.
   Frame(TEMP::Label *label,
         F::AccessList *formals,
@@ -115,7 +135,7 @@ AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst);
 AS::InstrList *F_procEntryExit2(AS::InstrList *body);
 F::Access *F_allocLocal(Frame *frame, bool escape);
 
-T::CallExp *F_externalCall(std::string s,T::ExpList *args);
+T::CallExp *F_externalCall(std::string s, T::ExpList *args);
 
 } // namespace F
 
