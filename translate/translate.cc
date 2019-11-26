@@ -120,7 +120,14 @@ public:
   {
     return new T::ExpStm(this->exp);
   }
-  Cx UnCx() const override {}
+  Cx UnCx() const override
+  {
+    Cx *uncx = new TR::Cx(nullptr, nullptr, nullptr);
+    uncx->stm = new T::CjumpStm(T::NE_OP, this->exp, 0, NULL, NULL);
+    uncx->trues = new PatchList(&(((T::CjumpStm *)uncx->stm)->true_label), NULL);
+    uncx->falses = new PatchList(&(((T::CjumpStm *)uncx->stm)->false_label), NULL);
+    return *uncx;
+  }
 };
 
 class NxExp : public Exp
@@ -147,7 +154,7 @@ TR::Exp *Nil()
 }
 void do_patch(PatchList *tList, TEMP::Label *label)
 {
-  for (; tList; tList = tList->tail)
+  for (; tList && tList->head; tList = tList->tail)
     *(tList->head) = label;
 }
 
@@ -277,7 +284,15 @@ TR::ExpAndTy FieldVar::Translate(S::Table<E::EnvEntry> *venv,
   // TODO: Put your codes here (lab5).
   // get type symbol field num
   int order = 0;
-
+  E::EnvEntry *var;
+  if (this->var->kind == SIMPLE)
+  {
+    var = venv->Look(((SimpleVar *)this->var)->sym);
+  }
+  else
+  {
+    assert(0);
+  }
   TY::FieldList *f = ((TY::RecordTy *)((E::VarEntry *)var)->ty)->fields;
   while (f && f->head)
   {
@@ -327,7 +342,7 @@ TR::ExpAndTy NilExp::Translate(S::Table<E::EnvEntry> *venv,
                                TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
-  return TR::ExpAndTy(nullptr, TY::NilTy::Instance());
+  return TR::ExpAndTy(TR::Nil(), TY::NilTy::Instance());
 }
 
 TR::ExpAndTy IntExp::Translate(S::Table<E::EnvEntry> *venv,
@@ -393,9 +408,19 @@ TR::ExpAndTy OpExp::Translate(S::Table<E::EnvEntry> *venv,
                               TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
-
-  T::Exp *leftexp = this->left->Translate(venv, tenv, level, label).exp->UnEx();
-  T::Exp *rightexp = this->right->Translate(venv, tenv, level, label).exp->UnEx();
+  TR::ExpAndTy leftexp_ty = this->left->Translate(venv, tenv, level, label);
+  T::Exp *leftexp, *rightexp;
+  if (this->oper == A::EQ_OP && leftexp_ty.ty->kind == TY::Ty::STRING)
+  {
+    //SHOULD USE STRINGEQUAL
+    leftexp = F::F_externalCall("stringEqual", new T::ExpList(leftexp, new T::ExpList(rightexp, NULL)));
+    rightexp = new T::ConstExp(1);
+  }
+  else
+  {
+    leftexp = leftexp_ty.exp->UnEx();
+    rightexp = this->right->Translate(venv, tenv, level, label).exp->UnEx();
+  }
   switch (this->oper)
   {
   case A::PLUS_OP:
@@ -415,8 +440,8 @@ TR::ExpAndTy OpExp::Translate(S::Table<E::EnvEntry> *venv,
   {
     TEMP::Label *t = TEMP::NewLabel();
     T::CjumpStm *cjumpstm = new T::CjumpStm(T::RelOp(this->oper - A::EQ_OP), leftexp, rightexp, nullptr, nullptr);
-    TR::PatchList *trues = new TR::PatchList(&cjumpstm->true_label, nullptr);
-    TR::PatchList *falses = new TR::PatchList(&cjumpstm->false_label, nullptr);
+    TR::PatchList *trues = new TR::PatchList(&(cjumpstm->true_label), nullptr);
+    TR::PatchList *falses = new TR::PatchList(&(cjumpstm->false_label), nullptr);
     TR::Cx *cx = new TR::Cx(trues, falses, cjumpstm);
     return TR::ExpAndTy(new TR::CxExp(*cx), TY::IntTy::Instance());
   }
@@ -428,25 +453,25 @@ TR::ExpAndTy OpExp::Translate(S::Table<E::EnvEntry> *venv,
 T::Stm *Tr_mk_record_array(T::ExpList *fields, T::Exp *r, int offset, int size)
 {
 
-  // if (size > 1)
-  // {
-  //   if (offset < size - 2)
-  //   {
-  //     return T_Seq(
-  //         T_Move(T_Binop(T_plus, T_Temp(r), T_Const(offset * wordsize)), Tr_unEx(fields->head)),
-  //         Tr_mk_record_array(fields->tail, r, offset + 1, size));
-  //   }
-  //   else
-  //   {
-  //     return T_Seq(
-  //         T_Move(T_Binop(T_plus, T_Temp(r), T_Const(offset * wordsize)), Tr_unEx(fields->head)),
-  //         T_Move(T_Binop(T_plus, T_Temp(r), T_Const((offset + 1) * wordsize)), Tr_unEx(fields->tail->head)));
-  //   }
-  // }
-  // else
-  // {
-  return new T::MoveStm(new T::BinopExp(T::PLUS_OP, r, new T::ConstExp(offset * wordsize)), fields->head);
-  // }
+  if (size > 1)
+  {
+    if (offset < size - 2)
+    {
+      return new T::SeqStm(
+          new T::MoveStm(new T::BinopExp(T::PLUS_OP, r, new T::ConstExp(offset * wordsize)), fields->head),
+          Tr_mk_record_array(fields->tail, r, offset + 1, size));
+    }
+    else
+    {
+      return new T::SeqStm(
+          new T::MoveStm(new T::BinopExp(T::PLUS_OP, r, new T::ConstExp(offset * wordsize)), fields->head),
+          new T::MoveStm(new T::BinopExp(T::PLUS_OP, r, new T::ConstExp((offset + 1) * wordsize)), fields->tail->head));
+    }
+  }
+  else
+  {
+    return new T::MoveStm(new T::BinopExp(T::PLUS_OP, r, new T::ConstExp(offset * wordsize)), fields->head);
+  }
 }
 
 TR::ExpAndTy RecordExp::Translate(S::Table<E::EnvEntry> *venv,
@@ -743,8 +768,8 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
     A::FieldList *p = f->params;
     U::BoolList *args = NULL;
     while (p && p->head)
-    {	
-      args = new U::BoolList(true,args);//Assume that all params are escaped.
+    {
+      args = new U::BoolList(true, args); //Assume that all params are escaped.
       p = p->tail;
     }
     TR::Level *newlevel = TR::Level::NewLevel(level, TEMP::NamedLabel(f->name->Name()), args);
