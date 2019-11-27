@@ -29,10 +29,15 @@ TEMP::Temp *F_R11();
 TEMP::Temp *F_R12();
 TEMP::Temp *F_R13();
 TEMP::Temp *F_R14();
-TEMP::Temp *F_R15();
-TEMP::Temp *F_SP();
-
+TEMP::Temp *F_R15(); 
+ 
+TEMP::Temp *F_SP(void);
+TEMP::Temp *F_ZERO(void);
+TEMP::Temp *F_RA(void);
+TEMP::Temp *F_RV(void);
+TEMP::TempList *F_callerSaveRegs();
 class AccessList;
+
 class Frame
 {
 public:
@@ -50,12 +55,6 @@ public:
 };
 
 Frame *F_newFrame(TEMP::Label *name, U::BoolList *escape);
-
-TEMP::Temp *F_FP(void);
-TEMP::Temp *F_SP(void);
-TEMP::Temp *F_ZERO(void);
-TEMP::Temp *F_RA(void);
-TEMP::Temp *F_RV(void);
 
 class Access
 {

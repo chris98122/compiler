@@ -218,8 +218,6 @@ F::FragList *TranslateProgram(A::Exp *root)
 
   TR::Level *main_level = Outermost();
 
-  F::FragList *frags = new F::FragList(nullptr, nullptr);
-
   TR::ExpAndTy mainexp = root->Translate(E::BaseVEnv(), E::BaseTEnv(), main_level, nullptr);
 
   TR::procEntryExit(main_level, mainexp.exp);
@@ -364,7 +362,7 @@ TR::ExpAndTy StringExp::Translate(S::Table<E::EnvEntry> *venv,
   F::StringFrag *strfrag = new F::StringFrag(l, this->s);
   // need to add to frags
   TR::addfrag(strfrag);
-  TR::ExExp *exexp = new TR::ExExp(new T::NameExp(label));
+  TR::ExExp *exexp = new TR::ExExp(new T::NameExp(l));
   return TR::ExpAndTy(exexp, TY::StringTy::Instance());
 }
 
@@ -377,7 +375,7 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
   // TY::TyList *func_arg_type_list = ((E::FunEntry *)value)->formals;
   ExpList *arg_list = this->args;
 
-  T::ExpList *args; //make T::ExpList
+  T::ExpList *args = NULL; //make T::ExpList
   while (arg_list && arg_list->head)
   {
     TR::ExpAndTy arg_exp = arg_list->head->Translate(venv, tenv, caller, label);
@@ -385,7 +383,10 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
     args = new T::ExpList(arg_exp.exp->UnEx(), args);
     arg_list = arg_list->tail;
   }
-  TEMP::Label *l = ((E::FunEntry *)value)->label;
+  // MAYBE CALL A LINKED function
+  TEMP::Label *l = TEMP::NamedLabel(this->func->Name());
+  assert(l);
+
   TR::Level *callee = ((E::FunEntry *)value)->level;
   //static_link
   //calculate static_link
@@ -571,7 +572,7 @@ TR::ExpAndTy IfExp::Translate(S::Table<E::EnvEntry> *venv,
 
     TR::ExpAndTy else_tr = this->elsee->Translate(venv, tenv, level, label);
     TEMP::Label *meeting = TEMP::NewLabel();
-
+    assert(meeting);
     T::EseqExp *ifexp = new T::EseqExp(test_.stm,
                                        new T::EseqExp(
                                            new T::LabelStm(t),
@@ -661,6 +662,7 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
                                        new T::BinopExp(T::PLUS_OP, loopvar, new T::ConstExp(1)));
 
   /*if(i < hi) {i++; goto body;}*/
+  assert(body_label);
   T::SeqStm *test = new T::SeqStm(new T::CjumpStm(T::LE_OP, loopvar, high.exp->UnEx(), incloop_label, done),
                                   new T::SeqStm(new T::LabelStm(incloop_label),
                                                 new T::SeqStm(incloop,
@@ -680,6 +682,7 @@ TR::ExpAndTy BreakExp::Translate(S::Table<E::EnvEntry> *venv,
                                  TEMP::Label *done) const
 {
   // TODO: Put your codes here (lab5).
+  assert(done);
   T::JumpStm *breakexp = new T::JumpStm(new T::NameExp(done), new TEMP::LabelList(done, NULL));
   return TR::ExpAndTy(new TR::NxExp(breakexp), TY::VoidTy::Instance());
 }
@@ -774,7 +777,9 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
     }
     TR::Level *newlevel = TR::Level::NewLevel(level, TEMP::NamedLabel(f->name->Name()), args);
     TY::TyList *formalTys = make_formal_tylist(tenv, f->params);
-    venv->Enter(f->name, new E::FunEntry(newlevel, label, formalTys, resultTy));
+    TEMP::Label *func_label = TEMP::NamedLabel(f->name->Name());
+    assert(func_label);
+    venv->Enter(f->name, new E::FunEntry(newlevel, func_label, formalTys, resultTy));
     fd = fd->tail;
   }
   fd = this->functions;

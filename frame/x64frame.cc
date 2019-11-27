@@ -13,8 +13,37 @@ static TEMP::Temp *rdx = NULL;
 static TEMP::Temp *rcx = NULL;
 static TEMP::Temp *r8 = NULL;
 static TEMP::Temp *r9 = NULL;
+
+static TEMP::Temp *r10 = NULL;
+static TEMP::Temp *r11 = NULL;
+static TEMP::Temp *r12 = NULL;
+static TEMP::Temp *r13 = NULL;
+static TEMP::Temp *r14 = NULL;
+static TEMP::Temp *r15 = NULL;
+
 static TEMP::Temp *rsp = NULL;
 static TEMP::Temp *rbx = NULL;
+
+//caller_saved register: rax rdi rsi rdx rcx r8 r9 r10 r11
+TEMP::TempList *F_callerSaveRegs()
+{
+  return new TEMP::TempList(F_RAX(),
+                            new TEMP::TempList(F_RDI(),
+                             new TEMP::TempList(F_RSI(),
+                              new TEMP::TempList(F_RDX(),
+                               new TEMP::TempList(F_RCX(),
+                                new TEMP::TempList(F_R8(),
+                                 new TEMP::TempList(F_R9() ,
+                                     new TEMP::TempList(F_R10(),
+                                         new TEMP::TempList(F_R11(),NULL)))))))));
+}
+TEMP::Temp *F_RBP(void)
+{
+  if (!rbp)
+    rbp = TEMP::Temp::NewTemp();
+  return rbp;
+}
+
 TEMP::Temp *F_FP(void)
 {
   if (!rbp)
@@ -32,6 +61,13 @@ TEMP::Temp *F_ZERO(void)
 }
 TEMP::Temp *F_RA(void)
 {
+}
+
+TEMP::Temp *F_RAX(void)
+{
+    if (!rax)
+    rax = TEMP::Temp::NewTemp();
+  return rax;
 }
 TEMP::Temp *F_RV(void) //return value of the callee
 {
@@ -76,6 +112,55 @@ TEMP::Temp *F_R9()
     r9 = TEMP::Temp::NewTemp();
   return r9;
 }
+
+TEMP::Temp *F_R10()
+{
+  if (!r10)
+    r10 = TEMP::Temp::NewTemp();
+  return r10;
+}
+
+TEMP::Temp *F_R11()
+{
+  if (!r11)
+    r11 = TEMP::Temp::NewTemp();
+  return r11;
+}
+
+
+TEMP::Temp *F_R12()
+{
+	if(!r12)
+		r12 =  TEMP::Temp::NewTemp();
+	return r12;
+}
+ 
+
+TEMP::Temp *F_R13()
+{
+	if(!r13)
+		r13 =  TEMP::Temp::NewTemp();
+	return r13;
+}
+
+
+
+TEMP::Temp *F_R14()
+{
+	if(!r14)
+		r14 =  TEMP::Temp::NewTemp();
+	return r14;
+}
+ 
+TEMP::Temp *F_R15()
+{
+	if(!r15)
+		r15 =  TEMP::Temp::NewTemp();
+	return r15;
+}
+ 
+
+
 TEMP::Temp *F_RBX()
 {
   if (!rbx)
