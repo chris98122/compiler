@@ -2,7 +2,7 @@
 #include "tiger/translate/translate.h"
 #include "tiger/frame/temp.h"
 #include "tiger/frame/frame.h"
-
+#include "stdio.h"
 #include "tiger/translate/tree.h"
 namespace CG
 {
@@ -30,26 +30,42 @@ static void emit(AS::Instr *inst)
 }
 static TEMP::Temp *munchOpExp(T::BinopExp *exp)
 {
-  // to do
+  TEMP::Temp *left = munchExp(exp->left), *right = munchExp(exp->right);
+  TEMP::Temp *r = TEMP::Temp::NewTemp();
+
   std::string op;
   switch (exp->op)
   {
   case T::MUL_OP:
   {
-    return nullptr;
+    emit(new AS::MoveInstr("movq `s0, `d0", new TEMP::TempList(F::F_RAX(), NULL), new TEMP::TempList(left, NULL)));
+    emit(new AS::OperInstr("imulq `s0", new TEMP::TempList(F::F_RDX(), NULL), new TEMP::TempList(F::F_RAX(), NULL), new AS::Targets(nullptr)));
+    emit(new AS::MoveInstr("movq `s0, `d0", new TEMP::TempList(r, NULL), new TEMP::TempList(F::F_RAX(), NULL)));
+    return r;
   }
   case T::DIV_OP:
   {
-    return nullptr;
+    TEMP::TempList *divident = new TEMP::TempList(F::F_RAX(), new TEMP::TempList(F::F_RDX(), NULL));
+    emit(new AS::MoveInstr("movq `s0, `d0", new TEMP::TempList(F::F_RAX(), NULL), new TEMP::TempList(left, NULL)));
+    emit(new AS::OperInstr("cltd", divident, new TEMP::TempList(F::F_RAX(), NULL), new AS::Targets(nullptr)));
+    emit(new AS::OperInstr("idivq `s0", divident,
+                           new TEMP::TempList(right, divident), new AS::Targets((NULL))));
+    emit(new AS::MoveInstr("movq `s0, `d0", new TEMP::TempList(r, NULL), new TEMP::TempList(F::F_RAX(), NULL)));
+    return r;
   }
   case T::PLUS_OP:
     op = "addl";
-    break;
+
   case T::MINUS_OP:
     op = "subq";
-    break;
+
   default:
-    break;
+    emit(new AS::MoveInstr("movq `s0, `d0",
+                           new TEMP::TempList(r, NULL), new TEMP::TempList(left, NULL)));
+    emit(new AS::OperInstr(op + " `s0, `d0", new TEMP::TempList(r, nullptr),
+                           new TEMP::TempList(right, new TEMP::TempList(r, nullptr)), new AS::Targets((NULL))));
+
+    return r;
   }
   return nullptr;
 }
@@ -115,7 +131,7 @@ static TEMP::TempList *munchArgs(int i, T::ExpList *args)
 static void saveCallerRegs(void)
 {
   TEMP::TempList *regs = F::F_callerSaveRegs();
-  int offset = -4;
+  int offset = -8;
   for (; regs; regs = regs->tail)
   {
     TEMP::Temp *reg = regs->head;
@@ -145,7 +161,6 @@ static TEMP::Temp *munchCallExp(T::CallExp *exp)
 
   TEMP::Temp *r = TEMP::Temp::NewTemp(), *rv = F::F_RV();
   saveCallerRegs();
-  //to do
   std::string assem = "call " + func_name;
   emit(new AS::OperInstr(assem, new TEMP::TempList(F::F_RAX(), NULL), NULL, new AS::Targets(NULL)));
   if (length)
@@ -214,7 +229,6 @@ static void munchMoveStm(T::MoveStm *stm)
 
   assert(dst->kind == T::Exp::MEM);
   dst = ((T::MemExp *)dst)->exp;
-  //to do T::exp:::binop
   if (dst->kind == T::Exp::BINOP)
   {
     if (((T::BinopExp *)dst)->op == T::PLUS_OP &&
@@ -222,7 +236,7 @@ static void munchMoveStm(T::MoveStm *stm)
     {
       TEMP::Temp *base = munchExp(((T::BinopExp *)dst)->left);
       int offset = ((T::ConstExp *)((T::BinopExp *)dst)->right)->consti;
-      std::string assem = "movq `s0," + std::to_string(offset) + " %d(`s1)";
+      std::string assem = "movq `s0," + std::to_string(offset) + " (`s1)";
       emit(new AS::OperInstr(assem, NULL, new TEMP::TempList(left, new TEMP::TempList(base, NULL)), NULL));
       return;
     }
@@ -232,6 +246,11 @@ static void munchMoveStm(T::MoveStm *stm)
                            new TEMP::TempList(left, new TEMP::TempList(right, nullptr)),
                            new AS::Targets(NULL)));
   }
+}
+static void munchLabelStm(T::LabelStm *stm)
+{
+  TEMP::Label *label = stm->label;
+  emit(new AS::LabelInstr(label->Name(), label));
 }
 static void munchStm(T::Stm *stm)
 {
@@ -245,9 +264,7 @@ static void munchStm(T::Stm *stm)
   }
   case T::Stm::LABEL:
   {
-    TEMP::Label *label = ((T::LabelStm *)stm)->label;
-    emit(new AS::LabelInstr(label->Name(), label));
-    return;
+    return munchLabelStm((T::LabelStm *)stm);
   }
   case T::Stm::CJUMP:
   {
@@ -300,6 +317,16 @@ static void munchStm(T::Stm *stm)
 static void restoreCallerRegs()
 {
   // to do
+  TEMP::TempList *regs = F::F_callerSaveRegs();
+  int offset = -8;
+  for (; regs; regs = regs->tail)
+  {
+    TEMP::Temp *reg = regs->head;
+    emit(new AS::OperInstr("movl" + std::to_string(offset) + "(`s0), `d0",
+                           new TEMP::TempList(reg, NULL),
+                           new TEMP::TempList(F::F_FP(), NULL), NULL));
+    offset -= wordsize;
+  }
 }
 
 static void saveCalleeRegs()
@@ -327,10 +354,11 @@ static void restoreCalleeRegs(void)
   emit(new AS::MoveInstr("movq `s0,`d0", new TEMP::TempList(F::F_R14(), NULL), new TEMP::TempList(savedr14, NULL)));
   emit(new AS::MoveInstr("movq `s0,`d0", new TEMP::TempList(F::F_R15(), NULL), new TEMP::TempList(savedr15, NULL)));
 }
+
 AS::InstrList *Codegen(F::Frame *f, T::StmList *stmList)
 {
   // TODO: Put your codes here (lab6).
-
+  instrList = NULL;
   saveCalleeRegs();
   int count = 0;
   for (; stmList; stmList = stmList->tail)
@@ -338,7 +366,7 @@ AS::InstrList *Codegen(F::Frame *f, T::StmList *stmList)
     munchStm(stmList->head);
     count++;
   }
-  // fprintf(stdout,  std::to_string(count).c_str());
+
   restoreCalleeRegs();
   return F::F_procEntryExit2(instrList);
 }

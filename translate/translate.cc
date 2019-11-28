@@ -222,6 +222,16 @@ F::FragList *TranslateProgram(A::Exp *root)
 
   TR::procEntryExit(main_level, mainexp.exp);
 
+  //debug
+  // F::FragList *p = frags;
+  // while (p && p->head)
+  // {
+  //   T::Stm *s = ((F::ProcFrag *)(p->head))->body;  
+  //   p=p->tail;
+  //   FILE *out = stdout;
+  //   s->Print(out, 0); 
+  //   printf("------====FRAGS=====-------\n");
+  // }
   return frags;
 }
 
@@ -231,19 +241,13 @@ void procEntryExit(Level *level, TR::Exp *func_body)
 
   T::MoveStm *adden = new T::MoveStm(new T::TempExp(F::F_RV()), func_body->UnEx()); //STORE func return value
 
-//  T::SeqStm* f = new T::SeqStm(func_body->UnNx(),adden);
-
-  T::Stm *func_body_stm = F_procEntryExit1(level->frame, adden );
+  T::Stm *func_body_stm = F_procEntryExit1(level->frame, adden);
 
   func_body = new TR::NxExp(adden);
 
-  F::ProcFrag *head = new F::ProcFrag(func_body_stm , level->frame);
+  F::ProcFrag *head = new F::ProcFrag(func_body_stm, level->frame);
   addfrag(head);
 
-  FILE *out = stdout;
-  func_body->UnNx()->Print(out, 0);
-
-  printf("------====TRANSLATE=====-------\n");
   // The added frag is the head of the new frags.
 }
 TR::NxExp *generate_assign(TR::Exp *leftvalue, TR::Exp *right)

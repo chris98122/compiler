@@ -341,7 +341,7 @@ AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst)
 
 AS::InstrList *F_procEntryExit2(AS::InstrList *body)
 {
-
+  
   static TEMP::TempList *returnSink = NULL;
   if (!returnSink)
     returnSink = new TEMP::TempList(rsp, new TEMP::TempList(F::F_FP(), NULL));

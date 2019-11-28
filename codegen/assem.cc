@@ -135,7 +135,7 @@ void MoveInstr::Print(FILE *out, TEMP::Map *m) const
   std::string result = format(this->assem, this->dst, this->src, nullptr, m);
   fprintf(out, "%s\n", result.c_str());
 }
-
+ 
 void InstrList::Print(FILE *out, TEMP::Map *m) const
 {
   const InstrList *p = this;
