@@ -231,11 +231,19 @@ void procEntryExit(Level *level, TR::Exp *func_body)
 
   T::MoveStm *adden = new T::MoveStm(new T::TempExp(F::F_RV()), func_body->UnEx()); //STORE func return value
 
-  T::Stm *stm = F_procEntryExit1(level->frame, adden);
- 
+//  T::SeqStm* f = new T::SeqStm(func_body->UnNx(),adden);
 
-  F::ProcFrag *head = new F::ProcFrag(stm, level->frame);
+  T::Stm *func_body_stm = F_procEntryExit1(level->frame, adden );
+
+  func_body = new TR::NxExp(adden);
+
+  F::ProcFrag *head = new F::ProcFrag(func_body_stm , level->frame);
   addfrag(head);
+
+  FILE *out = stdout;
+  func_body->UnNx()->Print(out, 0);
+
+  printf("------====TRANSLATE=====-------\n");
   // The added frag is the head of the new frags.
 }
 TR::NxExp *generate_assign(TR::Exp *leftvalue, TR::Exp *right)
@@ -387,8 +395,12 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
   // MAYBE CALL A LINKED function
   TEMP::Label *l = TEMP::NamedLabel(this->func->Name());
   assert(l != NULL);
+  TR::Level *callee;
+  if (value == NULL)
+    callee = new TR::Level(NULL, TR::Outermost());
+  else
+    callee = ((E::FunEntry *)value)->level;
 
-  TR::Level *callee = ((E::FunEntry *)value)->level;
   //static_link
   //calculate static_link
   T::Exp *staticlink = new T::TempExp(F::F_FP());
@@ -705,7 +717,8 @@ TR::ExpAndTy LetExp::Translate(S::Table<E::EnvEntry> *venv,
     seqstm = new T::SeqStm(dec_exp->UnNx(), seqstm);
     iter = iter->tail;
   }
-  assert(seqstm);
+  seqstm->right = new T::ExpStm(new T::ConstExp(0));
+  assert(seqstm && seqstm->right);
   TR::ExpAndTy body_exp = this->body->Translate(venv, tenv, level, label);
   TR::ExExp *r = new TR::ExExp(new T::EseqExp(seqstm, body_exp.exp->UnEx()));
   tenv->EndScope();
@@ -786,7 +799,7 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
   fd = this->functions;
 
   //Second loop:handle
- 
+
   while (fd && fd->head)
   {
     venv->BeginScope();
@@ -813,7 +826,7 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
     TR::Exp *body_exp = f->body->Translate(venv, tenv, func_level, label).exp;
 
     TR::procEntryExit(func_level, body_exp);
- 
+
     venv->EndScope();
     fd = fd->tail;
   }

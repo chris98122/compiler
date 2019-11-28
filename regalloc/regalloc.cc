@@ -6,9 +6,10 @@ namespace RA
 Result RegAlloc(F::Frame *f, AS::InstrList *il)
 {
   // TODO: Put your codes here (lab6).
-  TEMP::Map *map = new TEMP::Map();
+  TEMP::Map *map = new TEMP::Map( );
   TEMP::TempList *def, *use;
-  int count = 0;
+  long count = 0;
+  AS::InstrList *i = il;
   while (il && il->head)
   {
     AS::Instr *instr = il->head;
@@ -30,22 +31,33 @@ Result RegAlloc(F::Frame *f, AS::InstrList *il)
     }
     while (def && def->head)
     {
-      std::string reg = "r" + std::to_string(count);
-      map->Enter(def->head, &reg);
+      std::string *reg = new std::string("%r" + std::to_string(count));
+      map->Enter(def->head, reg);
       count++;
       def = def->tail;
     }
     while (use && use->head)
     {
-      std::string reg = "r" + std::to_string(count);
-      map->Enter(use->head, &reg);
+      std::string *reg = new std::string("%r" + std::to_string(count));
+      map->Enter(use->head, reg);
       count++;
       use = use->tail;
     }
-
     il = il->tail;
   }
-  return Result(map, il);
+  return Result(map,i);
+
+    // int offset = 8;
+    //   std::string assem = "movl " + std::to_string(offset) + "(`s0), `d0";
+
+    //   AS::Instr *newInstr = new AS::OperInstr(assem, new TEMP::TempList(use->head, NULL), new TEMP::TempList(F::F_FP(), NULL), NULL);
+    //   before = newInstr;
+    //   use = use->tail;
+
+    //   il->tail = new AS::InstrList(il->head, il->tail);
+    //   il->head = before;
+
+    //   il = il->tail;
 }
 
 } // namespace RA

@@ -57,7 +57,7 @@ static TEMP::Temp *munchConstExp(T::ConstExp *exp)
 {
 
   TEMP::Temp *r = TEMP::Temp::NewTemp();
-  emit(new AS::OperInstr("movq $" + std::to_string(exp->consti) +" ,`d0",
+  emit(new AS::OperInstr("movq $" + std::to_string(exp->consti) + " ,`d0",
                          new TEMP::TempList(r, nullptr),
                          NULL, NULL));
   return r;
@@ -245,8 +245,8 @@ static void munchStm(T::Stm *stm)
   }
   case T::Stm::LABEL:
   {
-    // TEMP::Label *label = ((T::LabelStm *)stm)->label;
-    // emit(new AS::LabelInstr(label->Name(), label));
+    TEMP::Label *label = ((T::LabelStm *)stm)->label;
+    emit(new AS::LabelInstr(label->Name(), label));
     return;
   }
   case T::Stm::CJUMP:
@@ -280,18 +280,20 @@ static void munchStm(T::Stm *stm)
                            new TEMP::TempList(left, new TEMP::TempList(right, NULL)),
                            new AS::Targets(NULL)));
 
-    emit(new AS::OperInstr(op + "`j0", NULL, NULL, new AS::Targets(new TEMP::LabelList(true_label, NULL))));
+    emit(new AS::OperInstr(op + " `j0", NULL, NULL, new AS::Targets(new TEMP::LabelList(true_label, NULL))));
+    return;
   }
   case T::Stm::JUMP:
   {
-   // std::string label = ((T::NameExp *)(((T::JumpStm *)stm)->exp))->name->Name();
+    // std::string label = ((T::NameExp *)(((T::JumpStm *)stm)->exp))->name->Name();
     emit(new AS::OperInstr("jmp `j0", NULL, NULL,
                            new AS::Targets(((T::JumpStm *)stm)->jumps)));
+    return;
   }
   case T::Stm::EXP:
   {
     munchExp(((T::ExpStm *)stm)->exp);
-    break;
+    return;
   }
   }
 }

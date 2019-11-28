@@ -315,20 +315,20 @@ T::Exp *InRegAccess ::ToExp(T::Exp *framePtr) const
 T::Stm *F_procEntryExit1(Frame *frame, T::Stm *stm)
 {
   T::StmList *iter = frame->view_shift;
-  T::SeqStm *res;
+  T::SeqStm *res = new T::SeqStm (stm , new T::ExpStm(new T::ConstExp(0)));
   while (iter && iter->head)
   {
     res = new T::SeqStm(iter->head, res);
     iter = iter->tail;
-  }
+  }  
   return res;
 }
 
 AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst)
 {
   std::string prolog;
-  std::string funcname = frame->label->Name() + ":\n";
-  prolog = funcname + "# exit3\n"
+ // std::string funcname = frame->label->Name() + ":\n";
+  prolog =   "# exit3\n"
                       "push %rbp\n"
                       "movq %rsp, %rbp\n"
                       "subq $" +
