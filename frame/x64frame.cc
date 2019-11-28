@@ -29,13 +29,13 @@ TEMP::TempList *F_callerSaveRegs()
 {
   return new TEMP::TempList(F_RAX(),
                             new TEMP::TempList(F_RDI(),
-                             new TEMP::TempList(F_RSI(),
-                              new TEMP::TempList(F_RDX(),
-                               new TEMP::TempList(F_RCX(),
-                                new TEMP::TempList(F_R8(),
-                                 new TEMP::TempList(F_R9() ,
-                                     new TEMP::TempList(F_R10(),
-                                         new TEMP::TempList(F_R11(),NULL)))))))));
+                                               new TEMP::TempList(F_RSI(),
+                                                                  new TEMP::TempList(F_RDX(),
+                                                                                     new TEMP::TempList(F_RCX(),
+                                                                                                        new TEMP::TempList(F_R8(),
+                                                                                                                           new TEMP::TempList(F_R9(),
+                                                                                                                                              new TEMP::TempList(F_R10(),
+                                                                                                                                                                 new TEMP::TempList(F_R11(), NULL)))))))));
 }
 TEMP::Temp *F_RBP(void)
 {
@@ -65,7 +65,7 @@ TEMP::Temp *F_RA(void)
 
 TEMP::Temp *F_RAX(void)
 {
-    if (!rax)
+  if (!rax)
     rax = TEMP::Temp::NewTemp();
   return rax;
 }
@@ -127,39 +127,33 @@ TEMP::Temp *F_R11()
   return r11;
 }
 
-
 TEMP::Temp *F_R12()
 {
-	if(!r12)
-		r12 =  TEMP::Temp::NewTemp();
-	return r12;
+  if (!r12)
+    r12 = TEMP::Temp::NewTemp();
+  return r12;
 }
- 
 
 TEMP::Temp *F_R13()
 {
-	if(!r13)
-		r13 =  TEMP::Temp::NewTemp();
-	return r13;
+  if (!r13)
+    r13 = TEMP::Temp::NewTemp();
+  return r13;
 }
-
-
 
 TEMP::Temp *F_R14()
 {
-	if(!r14)
-		r14 =  TEMP::Temp::NewTemp();
-	return r14;
+  if (!r14)
+    r14 = TEMP::Temp::NewTemp();
+  return r14;
 }
- 
+
 TEMP::Temp *F_R15()
 {
-	if(!r15)
-		r15 =  TEMP::Temp::NewTemp();
-	return r15;
+  if (!r15)
+    r15 = TEMP::Temp::NewTemp();
+  return r15;
 }
- 
-
 
 TEMP::Temp *F_RBX()
 {
@@ -332,14 +326,17 @@ T::Stm *F_procEntryExit1(Frame *frame, T::Stm *stm)
 
 AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst)
 {
-  char prolog[256];
-  sprintf(prolog, "# exit3\n"
-                  "push %%rbp\n"
-                  "movl %%rsp, %%rbp\n"
-                  "subl $%d, %%rsp\n",
-          abs(frame->s_offset));
-  char *epilog = "leave\nret\n";
-  return new AS::Proc(std::string(prolog), inst, epilog);
+  std::string prolog;
+  std::string funcname = frame->label->Name() + ":\n";
+  prolog = funcname + "# exit3\n"
+                      "push %rbp\n"
+                      "movq %rsp, %rbp\n"
+                      "subq $" +
+           std::to_string(
+               abs(frame->s_offset)) +
+           ", %rsp\n";
+  std::string epilog = "leave\nret\n";
+  return new AS::Proc(prolog, inst, epilog);
 }
 
 AS::InstrList *F_procEntryExit2(AS::InstrList *body)

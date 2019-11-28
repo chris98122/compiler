@@ -207,7 +207,7 @@ Level *Outermost()
   if (lv != nullptr)
     return lv;
 
-  lv = new Level(F::F_newFrame(TEMP::NamedLabel("main"), nullptr), nullptr);
+  lv = new Level(F::F_newFrame(TEMP::NamedLabel("tigermain"), new U::BoolList(true, nullptr)), nullptr);
   return lv;
 }
 
@@ -222,7 +222,7 @@ F::FragList *TranslateProgram(A::Exp *root)
 
   TR::procEntryExit(main_level, mainexp.exp);
 
-  return frags->tail;
+  return frags;
 }
 
 void procEntryExit(Level *level, TR::Exp *func_body)
@@ -232,6 +232,7 @@ void procEntryExit(Level *level, TR::Exp *func_body)
   T::MoveStm *adden = new T::MoveStm(new T::TempExp(F::F_RV()), func_body->UnEx()); //STORE func return value
 
   T::Stm *stm = F_procEntryExit1(level->frame, adden);
+ 
 
   F::ProcFrag *head = new F::ProcFrag(stm, level->frame);
   addfrag(head);
@@ -385,7 +386,7 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
   }
   // MAYBE CALL A LINKED function
   TEMP::Label *l = TEMP::NamedLabel(this->func->Name());
-  assert(l);
+  assert(l != NULL);
 
   TR::Level *callee = ((E::FunEntry *)value)->level;
   //static_link
@@ -704,7 +705,7 @@ TR::ExpAndTy LetExp::Translate(S::Table<E::EnvEntry> *venv,
     seqstm = new T::SeqStm(dec_exp->UnNx(), seqstm);
     iter = iter->tail;
   }
-
+  assert(seqstm);
   TR::ExpAndTy body_exp = this->body->Translate(venv, tenv, level, label);
   TR::ExExp *r = new TR::ExExp(new T::EseqExp(seqstm, body_exp.exp->UnEx()));
   tenv->EndScope();
@@ -785,6 +786,7 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
   fd = this->functions;
 
   //Second loop:handle
+ 
   while (fd && fd->head)
   {
     venv->BeginScope();
@@ -809,9 +811,10 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
     }
 
     TR::Exp *body_exp = f->body->Translate(venv, tenv, func_level, label).exp;
-    TR::procEntryExit(level, body_exp);
-    venv->EndScope();
 
+    TR::procEntryExit(func_level, body_exp);
+ 
+    venv->EndScope();
     fd = fd->tail;
   }
   return TR::Nil();
