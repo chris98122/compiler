@@ -123,7 +123,7 @@ public:
   Cx UnCx() const override
   {
     Cx *uncx = new TR::Cx(nullptr, nullptr, nullptr);
-    uncx->stm = new T::CjumpStm(T::NE_OP, this->exp, 0, NULL, NULL);
+    uncx->stm = new T::CjumpStm(T::NE_OP, this->exp,new  T::ConstExp(0), NULL, NULL);
     uncx->trues = new PatchList(&(((T::CjumpStm *)uncx->stm)->true_label), NULL);
     uncx->falses = new PatchList(&(((T::CjumpStm *)uncx->stm)->false_label), NULL);
     return *uncx;
@@ -223,15 +223,15 @@ F::FragList *TranslateProgram(A::Exp *root)
   TR::procEntryExit(main_level, mainexp.exp);
 
   //debug
-  // F::FragList *p = frags;
-  // while (p && p->head)
-  // {
-  //   T::Stm *s = ((F::ProcFrag *)(p->head))->body;  
-  //   p=p->tail;
-  //   FILE *out = stdout;
-  //   s->Print(out, 0); 
-  //   printf("------====FRAGS=====-------\n");
-  // }
+  F::FragList *p = frags;
+  while (p && p->head)
+  {
+    T::Stm *s = ((F::ProcFrag *)(p->head))->body;
+    p = p->tail;
+    FILE *out = stdout;
+    s->Print(out, 0);
+    printf("------====FRAGS=====-------\n");
+  }
   return frags;
 }
 
@@ -476,19 +476,27 @@ T::Stm *Tr_mk_record_array(T::ExpList *fields, T::Exp *r, int offset, int size)
     if (offset < size - 2)
     {
       return new T::SeqStm(
-          new T::MoveStm(new T::BinopExp(T::PLUS_OP, r, new T::ConstExp(offset * wordsize)), fields->head),
+          new T::MoveStm(new T::MemExp(
+                             new T::BinopExp(T::PLUS_OP, r, new T::ConstExp(offset * wordsize))),
+                         fields->head),
           Tr_mk_record_array(fields->tail, r, offset + 1, size));
     }
     else
     {
       return new T::SeqStm(
-          new T::MoveStm(new T::BinopExp(T::PLUS_OP, r, new T::ConstExp(offset * wordsize)), fields->head),
-          new T::MoveStm(new T::BinopExp(T::PLUS_OP, r, new T::ConstExp((offset + 1) * wordsize)), fields->tail->head));
+          new T::MoveStm(new T::MemExp(
+                             new T::BinopExp(T::PLUS_OP, r, new T::ConstExp(offset * wordsize))),
+                         fields->head),
+          new T::MoveStm(new T::MemExp(
+                             new T::BinopExp(T::PLUS_OP, r, new T::ConstExp((offset + 1) * wordsize))),
+                         fields->tail->head));
     }
   }
   else
   {
-    return new T::MoveStm(new T::BinopExp(T::PLUS_OP, r, new T::ConstExp(offset * wordsize)), fields->head);
+    return new T::MoveStm(new T::MemExp(
+                              new T::BinopExp(T::PLUS_OP, r, new T::ConstExp(offset * wordsize))),
+                          fields->head);
   }
 }
 
