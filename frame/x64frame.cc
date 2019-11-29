@@ -55,14 +55,7 @@ TEMP::Temp *F_SP(void)
   if (!rsp)
     rsp = TEMP::Temp::NewTemp();
   return rsp;
-}
-TEMP::Temp *F_ZERO(void)
-{
-}
-TEMP::Temp *F_RA(void)
-{
-}
-
+} 
 TEMP::Temp *F_RAX(void)
 {
   if (!rax)
@@ -172,27 +165,6 @@ public:
       : Frame(label, formals, locals, view_shift, s_offset) {}
 };
 
-class InFrameAccess : public F::Access
-{
-public:
-  int offset;
-  T::Exp *ToExp(T::Exp *framePtr) const override;
-
-  InFrameAccess(int offset) : Access(INFRAME), offset(offset) {}
-};
-
-T::Exp *InFrameAccess ::ToExp(T::Exp *framePtr) const
-{
-  return new T::MemExp(new T::BinopExp(T::PLUS_OP, framePtr, new T::ConstExp(this->offset)));
-}
-
-class InRegAccess : public F::Access
-{
-public:
-  TEMP::Temp *reg;
-  T::Exp *ToExp(T::Exp *framePtr) const override;
-  InRegAccess(TEMP::Temp *reg) : Access(INREG), reg(reg) {}
-};
 
 Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
 {
@@ -307,10 +279,6 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
   return newframe;
 }
 
-T::Exp *InRegAccess ::ToExp(T::Exp *framePtr) const
-{
-  return new T::TempExp(this->reg);
-}
 
 T::Stm *F_procEntryExit1(Frame *frame, T::Stm *stm)
 {

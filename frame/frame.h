@@ -29,11 +29,9 @@ TEMP::Temp *F_R11();
 TEMP::Temp *F_R12();
 TEMP::Temp *F_R13();
 TEMP::Temp *F_R14();
-TEMP::Temp *F_R15(); 
- 
-TEMP::Temp *F_SP(void);
-TEMP::Temp *F_ZERO(void);
-TEMP::Temp *F_RA(void);
+TEMP::Temp *F_R15();
+
+TEMP::Temp *F_SP(void); 
 TEMP::Temp *F_RV(void);
 TEMP::TempList *F_callerSaveRegs();
 class AccessList;
@@ -45,7 +43,7 @@ public:
   TEMP::Label *label;
   F::AccessList *formals;
   F::AccessList *locals;
-  T::StmList *view_shift; 
+  T::StmList *view_shift;
   int s_offset; //Which is commonly a minus number.
   Frame(TEMP::Label *label,
         F::AccessList *formals,
@@ -71,6 +69,29 @@ public:
 
   // Hints: You may add interface like
   virtual T::Exp *ToExp(T::Exp *framePtr) const = 0;
+};
+
+class InFrameAccess : public F::Access
+{
+public:
+  int offset;
+  T::Exp *ToExp(T::Exp *framePtr) const override
+  {
+    return new T::MemExp(new T::BinopExp(T::PLUS_OP, framePtr, new T::ConstExp(this->offset)));
+  }
+
+  InFrameAccess(int offset) : Access(INFRAME), offset(offset) {}
+};
+
+class InRegAccess : public F::Access
+{
+public:
+  TEMP::Temp *reg;
+  T::Exp *ToExp(T::Exp *framePtr) const override
+  {
+    return new T::TempExp(this->reg);
+  }
+  InRegAccess(TEMP::Temp *reg) : Access(INREG), reg(reg) {}
 };
 
 class AccessList

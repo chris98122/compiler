@@ -123,7 +123,7 @@ public:
   Cx UnCx() const override
   {
     Cx *uncx = new TR::Cx(nullptr, nullptr, nullptr);
-    uncx->stm = new T::CjumpStm(T::NE_OP, this->exp,new  T::ConstExp(0), NULL, NULL);
+    uncx->stm = new T::CjumpStm(T::NE_OP, this->exp, new T::ConstExp(0), NULL, NULL);
     uncx->trues = new PatchList(&(((T::CjumpStm *)uncx->stm)->true_label), NULL);
     uncx->falses = new PatchList(&(((T::CjumpStm *)uncx->stm)->false_label), NULL);
     return *uncx;
@@ -222,16 +222,17 @@ F::FragList *TranslateProgram(A::Exp *root)
 
   TR::procEntryExit(main_level, mainexp.exp);
 
-  //debug
-  F::FragList *p = frags;
-  while (p && p->head)
-  {
-    T::Stm *s = ((F::ProcFrag *)(p->head))->body;
-    p = p->tail;
-    FILE *out = stdout;
-    s->Print(out, 0);
-    printf("------====FRAGS=====-------\n");
-  }
+  // //debug
+  // F::FragList *p = frags;
+  // while (p && p->head)
+  // {
+  //   if(p->head->kind == PROC)
+  //  { T::Stm *s = ((F::ProcFrag *)(p->head))->body;
+  //   p = p->tail;
+  //   FILE *out = stdout;
+  //   s->Print(out, 0);
+  //   printf("------====FRAGS=====-------\n");}
+  // }
   return frags;
 }
 

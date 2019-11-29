@@ -54,7 +54,7 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
     return r;
   }
   case T::PLUS_OP:
-    op = "addl";
+    op = "addq";
 
   case T::MINUS_OP:
     op = "subq";
@@ -115,31 +115,54 @@ static TEMP::Temp *munchNameExp(T::NameExp *exp)
                          new TEMP::TempList(r, NULL), NULL, new AS::Targets(nullptr)));
   return r;
 }
-static TEMP::TempList *munchArgs(int i, T::ExpList *args)
+static void munchArgs(T::ExpList *list)
 {
-  if (!args)
-    return NULL;
-  TEMP::TempList *right = munchArgs(i + 1, args->tail);
-  TEMP::Temp *left = munchExp(args->head);
-  emit(new AS::OperInstr("pushl `s0", new TEMP::TempList(F::F_SP(), NULL),
-                         new TEMP::TempList(left, new TEMP::TempList(F::F_SP(), NULL)), NULL));
-  return new TEMP::TempList(left, right);
+  int num = 1;
+  TEMP::Temp *arg = TEMP::Temp::NewTemp();
+  for (T::ExpList *l = list; l; l = l->tail, num++)
+  {
+    arg = munchExp(l->head);
+    switch (num)
+    {
+    case 1:
+      emit(new AS::MoveInstr("#munchArgs \nmovq `s0,`d0", new TEMP::TempList(F::F_RDI(), NULL), new TEMP::TempList(arg, NULL)));
+      break;
+    case 2:
+      emit(new AS::MoveInstr("movq `s0,`d0", new TEMP::TempList(F::F_RSI(), NULL), new TEMP::TempList(arg, NULL)));
+      break;
+    case 3:
+      emit(new AS::MoveInstr("movq `s0,`d0", new TEMP::TempList(F::F_RDX(), NULL), new TEMP::TempList(arg, NULL)));
+      break;
+    case 4:
+      emit(new AS::MoveInstr("movq `s0,`d0", new TEMP::TempList(F::F_RCX(), NULL), new TEMP::TempList(arg, NULL)));
+      break;
+    case 5:
+      emit(new AS::MoveInstr("movq `s0,`d0", new TEMP::TempList(F::F_R8(), NULL), new TEMP::TempList(arg, NULL)));
+      break;
+    case 6:
+      emit(new AS::MoveInstr("movq `s0,`d0", new TEMP::TempList(F::F_R9(), NULL), new TEMP::TempList(arg, NULL)));
+      break;
+    default:
+      emit(new AS::OperInstr("pushq `s0", NULL, new TEMP::TempList(arg, NULL), new AS::Targets(nullptr)));
+      break;
+    }
+  }
 }
 
 //caller_saved register: rax rdi rsi rdx rcx r8 r9 r10 r11
-//callee_saved register: rbx rbp r12 r13 r14 r15
-static void saveCallerRegs(void)
-{
-  TEMP::TempList *regs = F::F_callerSaveRegs();
-  int offset = -8;
-  for (; regs; regs = regs->tail)
-  {
-    TEMP::Temp *reg = regs->head;
-    std::string assem = "movq `s0, " + std::to_string(offset) + "(`s1)";
-    emit(new AS::OperInstr(assem, NULL, new TEMP::TempList(reg, new TEMP::TempList(F::F_FP(), NULL)), nullptr));
-    offset -= wordsize;
-  }
-}
+//  callee_saved register: rbx rbp r12 r13 r14 r15
+// static void saveCallerRegs(void)
+// {
+//   TEMP::TempList *regs = F::F_callerSaveRegs();
+//   int offset = -8;
+//   for (; regs; regs = regs->tail)
+//   {
+//     TEMP::Temp *reg = regs->head;
+//     std::string assem = "movq `s0, " + std::to_string(offset) + "(`s1)";
+//     emit(new AS::OperInstr(assem, NULL, new TEMP::TempList(reg, new TEMP::TempList(F::F_FP(), NULL)), nullptr));
+//     offset -= wordsize;
+//   }
+//}
 
 int TempListLength(TEMP::TempList *l)
 {
@@ -150,26 +173,25 @@ int TempListLength(TEMP::TempList *l)
 
 static TEMP::Temp *munchCallExp(T::CallExp *exp)
 {
+
   T::Exp *func_exp = ((exp)->fun);
   assert(func_exp->kind == T::Exp::NAME);
+
+  TEMP::Label *func = ((T::NameExp *)func_exp)->name;
+
   std::string func_name = TEMP::LabelString(((T::NameExp *)func_exp)->name);
 
   T::ExpList *args = (exp)->args;
+  munchArgs(args);
 
-  TEMP::TempList *argtemps = munchArgs(0, args);
-  int length = TempListLength(argtemps);
-
-  TEMP::Temp *r = TEMP::Temp::NewTemp(), *rv = F::F_RV();
-  saveCallerRegs();
   std::string assem = "call " + func_name;
-  emit(new AS::OperInstr(assem, new TEMP::TempList(F::F_RAX(), NULL), NULL, new AS::Targets(NULL)));
-  if (length)
-  {
-    std::string assem_t = "addl $" + std::to_string(wordsize * length) + " ,`d0";
-    emit(new AS::OperInstr(assem_t, new TEMP::TempList(F::F_SP(), NULL), NULL, NULL));
-  }
-  emit(new AS::MoveInstr("movq `s0, `d0", new TEMP::TempList(r, NULL), new TEMP::TempList(rv, NULL)));
-  restoreCallerRegs();
+  emit(new AS::OperInstr(assem, F::F_callerSaveRegs(), nullptr, new AS::Targets(NULL)));
+
+  TEMP::Temp *r = TEMP::Temp::NewTemp();
+  emit(new AS::MoveInstr("movq `s0, `d0", new TEMP::TempList(r, NULL),
+                         new TEMP::TempList(F::F_RAX(), NULL)));
+
+  return r;
 }
 static TEMP::Temp *munchExp(T::Exp *exp)
 {
@@ -314,20 +336,20 @@ static void munchStm(T::Stm *stm)
   }
   }
 }
-static void restoreCallerRegs()
-{
-  // to do
-  TEMP::TempList *regs = F::F_callerSaveRegs();
-  int offset = -8;
-  for (; regs; regs = regs->tail)
-  {
-    TEMP::Temp *reg = regs->head;
-    emit(new AS::OperInstr("movl" + std::to_string(offset) + "(`s0), `d0",
-                           new TEMP::TempList(reg, NULL),
-                           new TEMP::TempList(F::F_FP(), NULL), NULL));
-    offset -= wordsize;
-  }
-}
+// static void restoreCallerRegs()
+// {
+//   // to do
+//   TEMP::TempList *regs = F::F_callerSaveRegs();
+//   int offset = -8;
+//   for (; regs; regs = regs->tail)
+//   {
+//     TEMP::Temp *reg = regs->head;
+//     emit(new AS::OperInstr("movl" + std::to_string(offset) + "(`s0), `d0",
+//                            new TEMP::TempList(reg, NULL),
+//                            new TEMP::TempList(F::F_FP(), NULL), NULL));
+//     offset -= wordsize;
+//   }
+// }
 
 static void saveCalleeRegs()
 {

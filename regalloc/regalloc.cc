@@ -3,17 +3,147 @@
 namespace RA
 {
 
+bool isreg(TEMP::Temp *t, TEMP::Map *m)
+{
+
+  if (t == F::F_RBX())
+  {
+    std::string *addr = new std::string("%rbx");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_FP() || t == F::F_RBP())
+  {
+    std::string *addr = new std::string("%rbp");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_SP())
+  {
+    std::string *addr = new std::string("%rsp");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_RAX())
+  {
+    std::string *addr = new std::string("%rax");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_RSI())
+  {
+    std::string *addr = new std::string("%rsi");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_RCX())
+  {
+    std::string *addr = new std::string("%rcx");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_RDI())
+  {
+    std::string *addr = new std::string("%rdi");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_R8())
+  {
+    std::string *addr = new std::string("%r8");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_R9())
+  {
+    std::string *addr = new std::string("%r9");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_R10())
+  {
+    std::string *addr = new std::string("%r10");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_R11())
+  {
+    std::string *addr = new std::string("%r11");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_R12())
+  {
+    std::string *addr = new std::string("%r12");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_R13())
+  {
+    std::string *addr = new std::string("%r13");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_R14())
+  {
+    std::string *addr = new std::string("%r14");
+    m->Enter(t, addr);
+    return true;
+  }
+  if (t == F::F_R15())
+  {
+    std::string *addr = new std::string("%r15");
+    m->Enter(t, addr);
+    return true;
+  }
+
+  return false;
+}
+
+static void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map);
 Result RegAlloc(F::Frame *f, AS::InstrList *il)
 {
   // TODO: Put your codes here (lab6).
-  TEMP::Map *map = new TEMP::Map( );
-  TEMP::TempList *def, *use;
-  long count = 0;
-  AS::InstrList *i = il;
-  while (il && il->head)
+  TEMP::Map *map = TEMP::Map::Empty();
+ 
+  RewriteProgram(f, il, map);
+
+  map->Enter(F::F_SP(),new std::string("%rsp"));
+  return Result(map, il);
+}
+
+static TEMP::TempList *replaceTempList(TEMP::TempList *instr, TEMP::Map *map, TEMP::Temp *new_t)
+{
+  if (instr)
   {
-    AS::Instr *instr = il->head;
-    switch (instr->kind)
+    if (!isreg(instr->head, map))
+    {
+      return new TEMP::TempList(new_t, replaceTempList(instr->tail, map, new_t));
+    }
+    else
+    {
+      return new TEMP::TempList(instr->head, replaceTempList(instr->tail, map, new_t));
+    }
+  }
+}
+void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
+{
+
+  AS::InstrList *il = pil,
+                *instr, //every instruction in il
+      *last,            // last handled instruction
+      *next,            //next instruction
+      *new_instr;       //new_instruction after spilling.
+  int off;
+  f->s_offset -= 8;
+  instr = il;
+  last = NULL;
+  while (instr)
+  {
+    TEMP::Temp *t = NULL;
+    next = instr->tail;
+    TEMP::TempList *def, *use;
+    switch (instr->head->kind)
     {
     case AS::Instr::MOVE:
       def = ((AS::MoveInstr *)instr)->dst;
@@ -27,37 +157,52 @@ Result RegAlloc(F::Frame *f, AS::InstrList *il)
     default:
       def = NULL;
       use = NULL;
-      break;
     }
-    while (def && def->head)
+    if (use)
     {
-      std::string *reg = new std::string("%r" + std::to_string(count));
-      map->Enter(def->head, reg);
-      count++;
-      def = def->tail;
+      t = TEMP::Temp::NewTemp();
+      map->Enter(t, new std::string("t"));
+
+      //Replace spilledtemp by t.
+      *use = *replaceTempList(use, map, t);
+      std::string assem = "# Spill load\nmovq " + std::to_string(f->s_offset) + "(%rsp),`d0\n";
+
+      //Add the new instruction betfore the old one.
+      AS::OperInstr *os_instr = new AS::OperInstr(assem, new TEMP::TempList(t, nullptr), NULL, new AS::Targets(NULL));
+      new_instr = new AS::InstrList(os_instr, instr);
+
+      if (last)
+      {
+        last->tail = new_instr;
+      }
+      else //instr is the first instruction of il.
+      {
+        il = new_instr;
+      }
     }
-    while (use && use->head)
+    last = instr;
+
+    if (def)
     {
-      std::string *reg = new std::string("%r" + std::to_string(count));
-      map->Enter(use->head, reg);
-      count++;
-      use = use->tail;
+      if (!t)
+      {
+        t = TEMP::Temp::NewTemp();
+
+        map->Enter(t, new std::string("t"));
+      }
+
+      *def = *replaceTempList(def, map, t);
+      std::string assem = "# Spill store\nmovq `s0" + std::to_string(f->s_offset) + "(%rsp) \n";
+      //Add the new instruction betfore the old one.
+      AS::OperInstr *os_instr = new AS::OperInstr(assem, NULL, new TEMP::TempList(t, nullptr), new AS::Targets(NULL));
+      instr->tail = new AS::InstrList(os_instr, next);
+
+      last = instr->tail;
     }
-    il = il->tail;
+    instr = next;
   }
-  return Result(map,i);
 
-    // int offset = 8;
-    //   std::string assem = "movl " + std::to_string(offset) + "(`s0), `d0";
-
-    //   AS::Instr *newInstr = new AS::OperInstr(assem, new TEMP::TempList(use->head, NULL), new TEMP::TempList(F::F_FP(), NULL), NULL);
-    //   before = newInstr;
-    //   use = use->tail;
-
-    //   il->tail = new AS::InstrList(il->head, il->tail);
-    //   il->head = before;
-
-    //   il = il->tail;
+  f->s_offset += 8;
+  pil = il;
 }
-
 } // namespace RA
