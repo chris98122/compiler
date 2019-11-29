@@ -128,6 +128,7 @@ static TEMP::TempList *replaceTempList(TEMP::TempList *instr, TEMP::Map *map, TE
 }
 void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
 {
+  std::string fs = TEMP::LabelString(f->label) + "_framesize";
 
   AS::InstrList *il = pil,
                 *instr, //every instruction in il
@@ -138,34 +139,36 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
   f->s_offset -= 8;
   instr = il;
   last = NULL;
+
   while (instr)
   {
     TEMP::Temp *t = NULL;
     next = instr->tail;
-    TEMP::TempList *def, *use;
+    TEMP::TempList *def = nullptr, *use= nullptr;
     switch (instr->head->kind)
     {
     case AS::Instr::MOVE:
-      def = ((AS::MoveInstr *)instr)->dst;
-      use = ((AS::MoveInstr *)instr)->src;
+      def = ((AS::MoveInstr *)instr->head)->dst;
+      use = ((AS::MoveInstr *)instr->head)->src;
 
       break;
     case AS::Instr::OPER:
-      def = ((AS::OperInstr *)instr)->dst;
-      use = ((AS::OperInstr *)instr)->src;
+      def = ((AS::OperInstr *)instr->head)->dst;
+      use = ((AS::OperInstr *)instr->head)->src;
       break;
     default:
       def = NULL;
       use = NULL;
     }
-    if (use)
+    if (use )
     {
       t = TEMP::Temp::NewTemp();
-      map->Enter(t, new std::string("t"));
+      map->Enter(t, new std::string("%r15"));
 
       //Replace spilledtemp by t.
       *use = *replaceTempList(use, map, t);
-      std::string assem = "# Spill load\nmovq " + std::to_string(f->s_offset) + "(%rsp),`d0\n";
+ 
+      std::string assem = "# Spill load\nmovq (" + fs+"-"+std::to_string(-f->s_offset) + ")(%rsp),`d0\n";
 
       //Add the new instruction betfore the old one.
       AS::OperInstr *os_instr = new AS::OperInstr(assem, new TEMP::TempList(t, nullptr), NULL, new AS::Targets(NULL));
@@ -182,17 +185,17 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
     }
     last = instr;
 
-    if (def)
+    if (def )
     {
       if (!t)
       {
         t = TEMP::Temp::NewTemp();
 
-        map->Enter(t, new std::string("t"));
+        map->Enter(t, new std::string("%r15"));
       }
 
       *def = *replaceTempList(def, map, t);
-      std::string assem = "# Spill store\nmovq `s0" + std::to_string(f->s_offset) + "(%rsp) \n";
+      std::string assem = "# Spill store\nmovq `s0, (" + fs+"-"+std::to_string(-f->s_offset) + ")(%rsp) \n";
       //Add the new instruction betfore the old one.
       AS::OperInstr *os_instr = new AS::OperInstr(assem, NULL, new TEMP::TempList(t, nullptr), new AS::Targets(NULL));
       instr->tail = new AS::InstrList(os_instr, next);
@@ -200,9 +203,9 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
       last = instr->tail;
     }
     instr = next;
-  }
 
-  f->s_offset += 8;
+  }
+ 
   pil = il;
 }
 } // namespace RA

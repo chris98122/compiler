@@ -55,7 +55,7 @@ TEMP::Temp *F_SP(void)
   if (!rsp)
     rsp = TEMP::Temp::NewTemp();
   return rsp;
-} 
+}
 TEMP::Temp *F_RAX(void)
 {
   if (!rax)
@@ -164,7 +164,6 @@ public:
            T::StmList *view_shift, int s_offset)
       : Frame(label, formals, locals, view_shift, s_offset) {}
 };
-
 
 Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
 {
@@ -279,41 +278,33 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
   return newframe;
 }
 
-
 T::Stm *F_procEntryExit1(Frame *frame, T::Stm *stm)
 {
   T::StmList *iter = frame->view_shift;
-  T::SeqStm *res = new T::SeqStm (stm , new T::ExpStm(new T::ConstExp(0)));
+  T::SeqStm *res = new T::SeqStm(stm, new T::ExpStm(new T::ConstExp(0)));
   while (iter && iter->head)
   {
     res = new T::SeqStm(iter->head, res);
     iter = iter->tail;
-  }  
+  }
   return res;
-}
-
-AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst)
-{
-  std::string prolog;
- // std::string funcname = frame->label->Name() + ":\n";
-  prolog =   "# exit3\n"
-                      "push %rbp\n"
-                      "movq %rsp, %rbp\n"
-                      "subq $" +
-           std::to_string(
-               abs(frame->s_offset)) +
-           ", %rsp\n";
-  std::string epilog = "leave\nret\n";
-  return new AS::Proc(prolog, inst, epilog);
 }
 
 AS::InstrList *F_procEntryExit2(AS::InstrList *body)
 {
-  
+
   static TEMP::TempList *returnSink = NULL;
   if (!returnSink)
-    returnSink = new TEMP::TempList(rsp, new TEMP::TempList(F::F_FP(), NULL));
+    returnSink = new TEMP::TempList(F::F_SP(), new TEMP::TempList(F::F_RAX(), NULL));
   return AS::InstrList::Splice(body, new AS::InstrList(new AS::OperInstr("#exit2", NULL, returnSink, NULL), NULL));
+}
+AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst)
+{
+  std::string fs = TEMP::LabelString(frame->label) + "_framesize";
+  std::string prolog = "#exit3\n .set " + fs +","+ std::to_string(-frame->s_offset) + "\n";
+  prolog = prolog + "subq $" + std::to_string(-frame->s_offset) + ",%rsp\n";
+  std::string epilog = "addq $" + std::to_string(-frame->s_offset) + ",%rsp\nret\n\n";
+  return new AS::Proc(prolog, inst, epilog);
 }
 
 F::Access *F_allocLocal(Frame *frame, bool escape)

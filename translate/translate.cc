@@ -207,7 +207,7 @@ Level *Outermost()
   if (lv != nullptr)
     return lv;
 
-  lv = new Level(F::F_newFrame(TEMP::NamedLabel("tigermain"), new U::BoolList(true, nullptr)), nullptr);
+  lv = new Level(F::F_newFrame(TEMP::NamedLabel("tigermain"), nullptr), nullptr);
   return lv;
 }
 
@@ -526,7 +526,7 @@ TR::ExpAndTy RecordExp::Translate(S::Table<E::EnvEntry> *venv,
   T::Stm *stm =
       new T::MoveStm(
           new T::TempExp(r),
-          F::F_externalCall("malloc", new T::ExpList(new T::ConstExp(count * wordsize), NULL)));
+          F::F_externalCall("allocRecord", new T::ExpList(new T::ConstExp(count * wordsize), NULL)));
   stm = new T::SeqStm(stm, Tr_mk_record_array(h->tail, new T::TempExp(r), 0, count));
   return TR::ExpAndTy(new TR::ExExp(new T::EseqExp(stm, new T::TempExp(r))), record);
 }

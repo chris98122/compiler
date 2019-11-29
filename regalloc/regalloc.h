@@ -18,6 +18,7 @@ public:
 
 Result RegAlloc(F::Frame *f, AS::InstrList *il);
 
+ 
 } // namespace RA
 
 #endif
