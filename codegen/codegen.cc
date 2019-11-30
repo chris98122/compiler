@@ -4,6 +4,10 @@
 #include "tiger/frame/frame.h"
 #include "stdio.h"
 #include "tiger/translate/tree.h"
+
+#include <iostream>
+#include <sstream>
+
 namespace CG
 {
 
@@ -65,8 +69,12 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
     if (exp->left->kind == T::Exp::TEMP && left == F::F_FP() && exp->right->kind == T::Exp::CONST)
     {
       int rightvalue = ((T::ConstExp *)(exp->right))->consti;
-      std::string assem = "leaq (" + fs + "-" + std::to_string(rightvalue) + ")(`s0),`d0";
-      emit(new AS::OperInstr(assem,
+      std::string instr;
+      std::stringstream ioss;
+      ioss << "leaq (" + fs + "-0x" << std::hex << rightvalue << ")(`s0),`d0";
+
+      instr = ioss.str();
+      emit(new AS::OperInstr(instr,
                              L(r, nullptr), L(F::F_SP(), nullptr), new AS::Targets(NULL)));
     }
     else
@@ -120,8 +128,12 @@ static TEMP::Temp *munchMemExp(T::MemExp *exp)
     {
       assert(right->kind == T::Exp::CONST);
       int offset = ((T::ConstExp *)right)->consti;
-      std::string assem = "movq (" + fs + "-" + std::to_string(-offset) + ")(`s0),`d0";
-      emit(new AS::OperInstr(assem,
+      std::string instr;
+      std::stringstream ioss;
+      ioss << "movq (" + fs + "-" << std::hex << -offset << ")(`s0),`d0";
+
+      instr = ioss.str();
+      emit(new AS::OperInstr(instr,
                              L(r, nullptr), L(F::F_SP(), nullptr), new AS::Targets(NULL)));
     }
     else
@@ -233,6 +245,7 @@ static TEMP::Temp *munchExp(T::Exp *exp)
     TEMP::Temp *t = ((T::TempExp *)exp)->temp;
     if (t == F::F_FP())
     {
+      
       std::string inst = "leaq " + fs + "(`s0),`d0";
       t = TEMP::Temp::NewTemp();
       emit(new AS::OperInstr(inst, L(t, NULL), L(F::F_SP(), NULL), new AS::Targets(NULL)));

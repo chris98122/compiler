@@ -1,5 +1,7 @@
 #include "tiger/frame/frame.h"
 
+#include <iostream>
+#include <sstream>
 #include <string>
 
 namespace F
@@ -174,7 +176,6 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
   F::AccessList *f_tail = formals;
   bool escape;
   TEMP::Temp *temp = TEMP::Temp::NewTemp();
- 
 
   int formal_off = wordsize; // The seventh arg was located at 8(%rbp)
   /*If the formal is escape, then allocate it on the frame.
@@ -302,9 +303,18 @@ AS::InstrList *F_procEntryExit2(AS::InstrList *body)
 AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst)
 {
   std::string fs = TEMP::LabelString(frame->label) + "_framesize";
-  std::string prolog = "#exit3\n .set " + fs +","+ std::to_string(-frame->s_offset) + "\n";
-  prolog = prolog + "subq $" + std::to_string(-frame->s_offset) + ",%rsp\n";
-  std::string epilog = "addq $" + std::to_string(-frame->s_offset) + ",%rsp\nret\n\n";
+
+  std::string prolog;
+  std::stringstream ioss;
+  ioss << "#exit3\n .set " + fs + ",0x" << std::hex << -frame->s_offset << "\n";
+  ioss << "subq $0x" << std::hex << -frame->s_offset << ",%rsp\n";
+
+  prolog = ioss.str();
+
+  std::stringstream ios;
+  ios << "addq $0x"<< std::hex << -frame->s_offset << ",%rsp\nret\n\n";
+
+  std::string epilog = ios.str();
   return new AS::Proc(prolog, inst, epilog);
 }
 

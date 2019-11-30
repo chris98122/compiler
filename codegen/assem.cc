@@ -52,6 +52,8 @@ static std::string format(std::string assem, TEMP::TempList *dst,
       {
         i++;
         int n = assem.at(i) - '0';
+        if(n==1) 
+          debug(src, n);
         if (!src)
           debug(src, n);
 
@@ -60,6 +62,9 @@ static std::string format(std::string assem, TEMP::TempList *dst,
         if (!t)
           debug(src, n);
         std::string *s = m->Look(t);
+
+        if (s == NULL)
+          debug(src, n);
         result += *s;
       }
       break;
@@ -67,12 +72,17 @@ static std::string format(std::string assem, TEMP::TempList *dst,
       {
         i++;
         int n = assem.at(i) - '0';
+        if(n==1) 
+          debug(dst, n);
+
         if (!dst)
           debug(dst, n);
         TEMP::Temp *t = nth_temp(dst, n);
         if (!t)
           debug(dst, n);
         std::string *s = m->Look(t);
+        if (s == NULL)
+          debug(dst, n);
         result += *s;
       }
       break;
@@ -135,7 +145,7 @@ void MoveInstr::Print(FILE *out, TEMP::Map *m) const
   std::string result = format(this->assem, this->dst, this->src, nullptr, m);
   fprintf(out, "%s\n", result.c_str());
 }
- 
+
 void InstrList::Print(FILE *out, TEMP::Map *m) const
 {
   const InstrList *p = this;

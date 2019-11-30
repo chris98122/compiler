@@ -233,6 +233,12 @@ F::FragList *TranslateProgram(A::Exp *root)
   //   s->Print(out, 0);
   //   printf("------====FRAGS=====-------\n");}
   // }
+  //free memory
+
+  
+
+
+
   return frags;
 }
 
