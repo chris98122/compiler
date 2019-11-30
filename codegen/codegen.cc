@@ -69,17 +69,30 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
       emit(new AS::OperInstr(assem,
                              L(r, nullptr), L(F::F_SP(), nullptr), new AS::Targets(NULL)));
     }
+    else
+    {
 
+      emit(new AS::MoveInstr("movq `s0, `d0",
+                             L(r, NULL), L(left, NULL)));
+      emit(new AS::OperInstr(op + "`s0, `d0", L(r, nullptr),
+                             L(right, L(r, nullptr)), new AS::Targets((NULL))));
+    }
+    return r;
+    break;
   case T::MINUS_OP:
+  {
     op = "subq ";
-
-  default:
     emit(new AS::MoveInstr("movq `s0, `d0",
                            L(r, NULL), L(left, NULL)));
     emit(new AS::OperInstr(op + "`s0, `d0", L(r, nullptr),
                            L(right, L(r, nullptr)), new AS::Targets((NULL))));
-
     return r;
+    break;
+  }
+
+  default:
+
+    assert(0);
   }
   assert(0);
   return nullptr;
@@ -347,7 +360,7 @@ static void saveCalleeRegs()
   savedr13 = TEMP::Temp::NewTemp();
   savedr14 = TEMP::Temp::NewTemp();
   savedr15 = TEMP::Temp::NewTemp();
-  emit(new AS::MoveInstr("movq `s0,`d0", L(savedrbx, NULL), L(F::F_RBX(), NULL)));
+  emit(new AS::MoveInstr("#saveCalleeRegs\nmovq `s0,`d0", L(savedrbx, NULL), L(F::F_RBX(), NULL)));
   emit(new AS::MoveInstr("movq `s0,`d0", L(savedrbp, NULL), L(F::F_RBP(), NULL)));
   emit(new AS::MoveInstr("movq `s0,`d0", L(savedr12, NULL), L(F::F_R12(), NULL)));
   emit(new AS::MoveInstr("movq `s0,`d0", L(savedr13, NULL), L(F::F_R13(), NULL)));
@@ -356,7 +369,7 @@ static void saveCalleeRegs()
 }
 static void restoreCalleeRegs(void)
 {
-  emit(new AS::MoveInstr("movq `s0,`d0", L(F::F_RBX(), NULL), L(savedrbx, NULL)));
+  emit(new AS::MoveInstr("#restoreCalleeRegs\nmovq `s0,`d0", L(F::F_RBX(), NULL), L(savedrbx, NULL)));
   emit(new AS::MoveInstr("movq `s0,`d0", L(F::F_RBP(), NULL), L(savedrbp, NULL)));
   emit(new AS::MoveInstr("movq `s0,`d0", L(F::F_R12(), NULL), L(savedr12, NULL)));
   emit(new AS::MoveInstr("movq `s0,`d0", L(F::F_R13(), NULL), L(savedr13, NULL)));

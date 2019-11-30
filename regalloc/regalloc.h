@@ -5,6 +5,8 @@
 #include "tiger/frame/frame.h"
 #include "tiger/frame/temp.h"
 
+#include "tiger/util/graph.h"
+#include <set>
 namespace RA
 {
 
@@ -17,8 +19,8 @@ public:
 };
 
 Result RegAlloc(F::Frame *f, AS::InstrList *il);
-
  
+static std::set <TEMP::Temp *>spilledNodes;
 } // namespace RA
 
 #endif
