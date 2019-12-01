@@ -8,7 +8,10 @@ void allocate_reg(AS::InstrList *instr, TEMP::Map *map);
 void addreg(TEMP::Map *m)
 {
 
-  std::string *addr = new std::string("%rbx");
+  std::string *addr = new std::string("%rdx");
+  m->Enter(F::F_RDX(), addr);
+
+  addr = new std::string("%rbx");
   m->Enter(F::F_RBX(), addr);
 
   addr = new std::string("%rbp");
@@ -47,7 +50,11 @@ void addreg(TEMP::Map *m)
 
 bool isreg(TEMP::Temp *t)
 {
-
+  if (t == F::F_RDX())
+  {
+    std::string *addr = new std::string("%rdx");
+    return true;
+  }
   if (t == F::F_RBX())
   {
     std::string *addr = new std::string("%rbx");
@@ -352,7 +359,7 @@ void allocate_reg(AS::InstrList *instr, TEMP::Map *map)
 
   init_regmap();
 
-  for(;instr;instr=instr->tail)
+  for (; instr; instr = instr->tail)
   {
 
     TEMP::TempList *def = nullptr, *use = nullptr;
@@ -371,7 +378,7 @@ void allocate_reg(AS::InstrList *instr, TEMP::Map *map)
       use = NULL;
     }
     if (def == NULL && use == NULL)
-    { 
+    {
       continue;
     }
     if (instr->head->kind == AS::Instr::OPER)
@@ -384,15 +391,15 @@ void allocate_reg(AS::InstrList *instr, TEMP::Map *map)
           if (!isreg(def->head))
           {
             //allocate register
-            std::string *regname = find_reg(true); 
+            std::string *regname = find_reg(true);
             spillmap[def->head] = regname;
             assert(map->Look(def->head) == NULL);
             map->Enter(def->head, regname);
             printf("%s Spill load allocated temp:%d\n", (*spillmap[def->head]).c_str(), def->head->Int());
           }
           def = def->tail;
-        } 
-        
+        }
+
         continue;
       }
       if (assem.size() >= 16 && assem.substr(0, 16) == "#use Spill store")
@@ -407,7 +414,7 @@ void allocate_reg(AS::InstrList *instr, TEMP::Map *map)
             printf("%s free  temp:%d\n", (*spillmap[use->head]).c_str(), use->head->Int());
           }
           use = use->tail;
-        } 
+        }
         continue;
       }
     }
@@ -429,7 +436,6 @@ void allocate_reg(AS::InstrList *instr, TEMP::Map *map)
       }
       def = def->tail;
     }
-
   }
 }
 std::string *find_reg(bool set_one)
@@ -448,11 +454,12 @@ std::string *find_reg(bool set_one)
   assert(0);
 }
 void init_regmap()
-{ 
+{
+
   regmap[new std::string("%rbx")] = 0;
   regmap[new std::string("%rax")] = 0;
   regmap[new std::string("%rsi")] = 0;
-  regmap[new std::string("%rcx")] = 0; 
+  regmap[new std::string("%rcx")] = 0;
   regmap[new std::string("%rdx")] = 0;
   regmap[new std::string("%r8")] = 0;
   regmap[new std::string("%r9")] = 0;

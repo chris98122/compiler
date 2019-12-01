@@ -180,9 +180,9 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
   int formal_off = wordsize; // The seventh arg was located at 8(%rbp)
   /*If the formal is escape, then allocate it on the frame.
 	  Else,allocate it on the temp.*/
-  X64Frame *newframe = new X64Frame(name, NULL, NULL, NULL, 0);
+  X64Frame *newframe = new X64Frame(name, NULL, NULL, NULL, -8);
 
-  int num = 1; //the num of formals
+  int num = 0; //the num of formals
   for (; escapes; escapes = escapes->tail, num++)
   {
     escape = escapes->head;
@@ -190,7 +190,7 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
     {
       switch (num)
       {
-      case 1:
+      case 0:
         v_tail->tail = new T::StmList(new T::MoveStm(
                                           new T::MemExp(
                                               new T::BinopExp(
@@ -202,7 +202,7 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
         break;
-      case 2:
+      case 1:
         v_tail->tail = new T::StmList(new T::MoveStm(
                                           new T::MemExp(
                                               new T::BinopExp(
@@ -214,7 +214,7 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
         break;
-      case 3:
+      case 2:
         v_tail->tail = new T::StmList(new T::MoveStm(
                                           new T::MemExp(
                                               new T::BinopExp(
@@ -226,7 +226,7 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
         break;
-      case 4:
+      case 3:
         v_tail->tail = new T::StmList(new T::MoveStm(
                                           new T::MemExp(
                                               new T::BinopExp(
@@ -238,7 +238,7 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
         break;
-      case 5:
+      case 4:
         v_tail->tail = new T::StmList(new T::MoveStm(
                                           new T::MemExp(
                                               new T::BinopExp(
@@ -250,7 +250,7 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
         break;
-      case 6:
+      case 5:
         v_tail->tail = new T::StmList(new T::MoveStm(
                                           new T::MemExp(
                                               new T::BinopExp(

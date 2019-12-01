@@ -417,8 +417,10 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
     //static link is the first escaped arg;
     caller = caller->parent;
   }
-
-  args = new T::ExpList(staticlink, args);
+  if (value != NULL)
+  {
+    args = new T::ExpList(staticlink, args);
+  }
 
   TR::ExExp *exexp = new TR::ExExp(new T::CallExp(new T::NameExp(l), args));
   return TR::ExpAndTy(exexp, ((E::FunEntry *)value)->result);
@@ -671,7 +673,7 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
 {
   // TODO: Put your codes here (lab5).
 
-  TEMP::Temp *limit = TEMP::Temp::NewTemp();
+  T::TempExp *limit = new T::TempExp(TEMP::Temp::NewTemp());
   TEMP::Label *incloop_label = TEMP::NewLabel();
   TEMP::Label *body_label = TEMP::NewLabel();
   TEMP::Label *done = TEMP::NewLabel();
@@ -692,16 +694,16 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
                                        new T::BinopExp(T::PLUS_OP, loopvar, new T::ConstExp(1)));
 
   T::SeqStm *init = new T::SeqStm(new T::MoveStm(loopvar, low.exp->UnEx()),
-                                  new T::MoveStm(new T::TempExp(limit), high.exp->UnEx()));
+                                  new T::MoveStm(limit, high.exp->UnEx()));
 
-  /*if(i < hi) {i++; goto body;}*/
+  /*if(i < limit) {i++; goto body;}*/
   assert(body_label);
-  T::SeqStm *test = new T::SeqStm(new T::CjumpStm(T::LE_OP, loopvar, high.exp->UnEx(), incloop_label, done),
+  T::SeqStm *test = new T::SeqStm(new T::CjumpStm(T::LT_OP, loopvar, limit, incloop_label, done),
                                   new T::SeqStm(new T::LabelStm(incloop_label),
                                                 new T::SeqStm(incloop,
                                                               new T::JumpStm(new T::NameExp(body_label), new TEMP::LabelList(body_label, NULL)))));
 
-  T::CjumpStm *checklohi = new T::CjumpStm(T::LE_OP, low.exp->UnEx(), high.exp->UnEx(), body_label, done);
+  T::CjumpStm *checklohi = new T::CjumpStm(T::LE_OP, loopvar, limit, body_label, done);
 
   T::SeqStm *for_exp = new T::SeqStm(init, new T::SeqStm(checklohi,
                                                          new T::SeqStm(new T::LabelStm(body_label),
