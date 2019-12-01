@@ -3,194 +3,76 @@
 namespace RA
 {
 
-void addreg(TEMP::Map *m)
-{
+static void RewriteProgram(F::Frame *f, AS::InstrList *pil);
 
-  std::string *addr = new std::string("%rbx");
-  m->Enter(F::F_RBX(), addr);
+static void AssignColors();
 
-  addr = new std::string("%rbp");
-  m->Enter(F::F_FP(), addr);
-  m->Enter(F::F_RBP(), addr);
+static void SelectSpill();
 
-  addr = new std::string("%rsp");
-  m->Enter(F::F_SP(), addr);
-  addr = new std::string("%rax");
-  m->Enter(F::F_RAX(), addr);
+static void MakeWorklist();
+static void Build();
 
-  addr = new std::string("%rsi");
-  m->Enter(F::F_RSI(), addr);
-  addr = new std::string("%rcx");
-  m->Enter(F::F_RCX(), addr);
+static void Simplify();
+static TEMP::Map *AssignRegisters(LIVE::LiveGraph g);
 
-  addr = new std::string("%rdi");
-  m->Enter(F::F_RDI(), addr);
-  addr = new std::string("%r8");
-  m->Enter(F::F_R8(), addr);
-  addr = new std::string("%r9");
-  m->Enter(F::F_R9(), addr);
-  addr = new std::string("%r10");
-  m->Enter(F::F_R10(), addr);
-  addr = new std::string("%r11");
-  m->Enter(F::F_R11(), addr);
-  addr = new std::string("%r12");
-  m->Enter(F::F_R12(), addr);
-  addr = new std::string("%r13");
-  m->Enter(F::F_R13(), addr);
-  addr = new std::string("%r14");
-  m->Enter(F::F_R14(), addr);
-  addr = new std::string("%r15");
-  m->Enter(F::F_R15(), addr);
-}
-
-bool isreg(TEMP::Temp *t)
-{
-
-  if (t == F::F_RBX())
-  {
-    std::string *addr = new std::string("%rbx");
-
-    return true;
-  }
-  if (t == F::F_FP() || t == F::F_RBP())
-  {
-    std::string *addr = new std::string("%rbp");
-
-    return true;
-  }
-  if (t == F::F_SP())
-  {
-    std::string *addr = new std::string("%rsp");
-
-    return true;
-  }
-  if (t == F::F_RAX())
-  {
-    std::string *addr = new std::string("%rax");
-
-    return true;
-  }
-  if (t == F::F_RSI())
-  {
-    std::string *addr = new std::string("%rsi");
-
-    return true;
-  }
-  if (t == F::F_RCX())
-  {
-    std::string *addr = new std::string("%rcx");
-
-    return true;
-  }
-  if (t == F::F_RDI())
-  {
-    std::string *addr = new std::string("%rdi");
-
-    return true;
-  }
-  if (t == F::F_R8())
-  {
-    std::string *addr = new std::string("%r8");
-
-    return true;
-  }
-  if (t == F::F_R9())
-  {
-    std::string *addr = new std::string("%r9");
-
-    return true;
-  }
-  if (t == F::F_R10())
-  {
-    std::string *addr = new std::string("%r10");
-
-    return true;
-  }
-  if (t == F::F_R11())
-  {
-    std::string *addr = new std::string("%r11");
-
-    return true;
-  }
-  if (t == F::F_R12())
-  {
-    std::string *addr = new std::string("%r12");
-
-    return true;
-  }
-  if (t == F::F_R13())
-  {
-    std::string *addr = new std::string("%r13");
-
-    return true;
-  }
-  if (t == F::F_R14())
-  {
-    std::string *addr = new std::string("%r14");
-
-    return true;
-  }
-  if (t == F::F_R15())
-  {
-    std::string *addr = new std::string("%r15");
-
-    return true;
-  }
-
-  return false;
-}
-
-static void add_temp(AS::InstrList *instr)
-{
-
-  while (instr)
-  {
-
-    TEMP::TempList *def = nullptr, *use = nullptr;
-    switch (instr->head->kind)
-    {
-    case AS::Instr::MOVE:
-      def = ((AS::MoveInstr *)instr->head)->dst;
-      use = ((AS::MoveInstr *)instr->head)->src;
-
-      break;
-    case AS::Instr::OPER:
-      def = ((AS::OperInstr *)instr->head)->dst;
-      use = ((AS::OperInstr *)instr->head)->src;
-      break;
-    }
-    while (def)
-    {
-      if (!isreg(def->head))
-      {
-        spilledNodes.insert(def->head);
-      }
-      def = def->tail;
-    }
-    while (use)
-    {
-
-      if (!isreg(use->head))
-      {
-        spilledNodes.insert(use->head);
-      }
-      use = use->tail;
-    }
-    instr = instr->tail;
-  }
-}
-
-static void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map);
 Result RegAlloc(F::Frame *f, AS::InstrList *il)
 {
   // TODO: Put your codes here (lab6).
-  TEMP::Map *map = TEMP::Map::Empty();
-  addreg(map);
-  add_temp(il);
+  Result *ret = new Result(nullptr, nullptr);
 
-  RewriteProgram(f, il, map);
+  bool done = false;
+  do
+  {
+    done = true;
+    /*Liveness Analysis*/
+    G::Graph<AS::Instr> *fg = FG::AssemFlowGraph(il, f);
+    live = LIVE::Liveness(fg);
 
-  return Result(map, il);
+    Build();
+
+    MakeWorklist();
+
+    while (simplifyWorklist || spillWorklist)
+    {
+
+      if (simplifyWorklist)
+      {
+        Simplify();
+      }
+      if (spillWorklist)
+      {
+        SelectSpill();
+      }
+    }
+
+    AssignColors();
+
+    if (spilledNodes)
+    {
+      RewriteProgram(f, il);
+      done = false;
+    }
+
+  } while (!done);
+
+  ret->coloring = AssignRegisters(live);
+  ret->il = il;
+
+  return *ret;
+}
+
+static TEMP::Map *AssignRegisters(LIVE::LiveGraph g)
+{
+  TEMP::Map *res = TEMP::Map::Empty();
+  G::NodeList<TEMP::Temp> *nodes = (g.graph)->Nodes();
+
+  res->Enter(F::F_SP(), new std::string("%rsp"));
+  for (; nodes; nodes = nodes->tail)
+  {
+    int *color = colorTab->Look(nodes->head);
+    res->Enter(nodes->head->NodeInfo(), hard_reg[*color]);
+  }
+  return res;
 }
 
 static TEMP::TempList *replaceTempList(TEMP::TempList *instr, TEMP::Temp *old, TEMP::Temp *new_t)
@@ -221,10 +103,11 @@ bool intemp(TEMP::TempList *list, TEMP::Temp *temp)
   }
   return false;
 }
-void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
+void RewriteProgram(F::Frame *f, AS::InstrList *pil)
 {
   std::string fs = TEMP::LabelString(f->label) + "_framesize";
 
+  notSpillTemps = NULL;
   AS::InstrList *il = new AS::InstrList(NULL, NULL);
   *il = *pil;
   AS::InstrList *instr, //every instruction in il
@@ -234,13 +117,11 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
   int off;
   int count = 0;
 
-  while (!spilledNodes.empty())
+  while (spilledNodes)
   {
-    printf("-------====tempcount:%d=====-----\n", count);
-    TEMP::Temp *spilltemp = *(spilledNodes.begin());
-
-    printf("-------====spilltemp :%d=====-----\n", spilltemp->Int());
-    spilledNodes.erase(spilledNodes.begin());
+    G::Node<TEMP::Temp> *cur = spilledNodes->head;
+    spilledNodes = spilledNodes->tail;
+    TEMP::Temp *spilledtemp = cur->NodeInfo();
     off = f->s_offset;
     f->s_offset -= 8;
     instr = il;
@@ -266,34 +147,23 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
         def = NULL;
         use = NULL;
       }
-      if (use && intemp(use, spilltemp))
+      if (use && intemp(use, spilledtemp))
       {
 
         t = TEMP::Temp::NewTemp();
-        if (count % 6 == 1)
-          map->Enter(t, new std::string("%r15"));
-        else if ((count % 6 == 2))
-          map->Enter(t, new std::string("%r14"));
-        else if ((count % 6 == 0))
-          map->Enter(t, new std::string("%r13"));
-        else if ((count % 6 == 3))
-          map->Enter(t, new std::string("%r12"));
-        else if ((count % 6 == 4))
-          map->Enter(t, new std::string("%r11"));
-        else if ((count % 6 == 5))
-          map->Enter(t, new std::string("%r10"));
+
+        notSpillTemps = new TEMP::TempList(t, notSpillTemps);
 
         printf("-------====replace temp :%d=====-----\n", t->Int());
 
         //Replace spilledtemp by t.
-        *use = *replaceTempList(use, spilltemp, t);
+        *use = *replaceTempList(use, spilledtemp, t);
 
-        assert(!intemp(use, spilltemp));
+        assert(!intemp(use, spilledtemp));
 
         std::string assem;
         std::stringstream ioss;
         ioss << "# Spill load\nmovq (" + fs + "-0x" << std::hex << -off << ")(%rsp),`d0\n";
-
         assem = ioss.str();
 
         //Add the new instruction betfore the old one.
@@ -308,22 +178,23 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
         {
           il = new_instr;
         }
+
       }
       last = instr;
 
-      if (def && intemp(def, spilltemp))
+      if (def && intemp(def, spilledtemp))
       {
         if (!t)
         {
           t = TEMP::Temp::NewTemp();
-          map->Enter(t, new std::string("%r10"));
 
+          notSpillTemps = new TEMP::TempList(t, notSpillTemps);
           printf("-------====replace temp :%d=====-----\n", t->Int());
         }
 
-        *def = *replaceTempList(def, spilltemp, t);
+        *def = *replaceTempList(def, spilledtemp, t);
 
-        assert(!intemp(def, spilltemp));
+        assert(!intemp(def, spilledtemp));
 
         std::string assem;
         std::stringstream ioss;
@@ -345,4 +216,140 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
   *pil = *il;
 }
 
+static void MakeWorklist()
+{
+  G::NodeList<TEMP::Temp> *nodes = (live.graph)->Nodes();
+
+  for (; nodes; nodes = nodes->tail)
+  {
+    G::Node<TEMP::Temp> *node = nodes->head;
+    int degree = node->Degree();
+    int *color = colorTab->Look(nodes->head);
+    //Reject precolored register
+    if (*color != 0)
+    {
+      continue;
+    }
+    if (degree >= K)
+    {
+      spillWorklist = new G::NodeList<TEMP::Temp>(node, spillWorklist);
+    }
+    else
+    {
+      simplifyWorklist = new G::NodeList<TEMP::Temp>(node, simplifyWorklist);
+    }
+  }
+}
+static void Build()
+{
+  simplifyWorklist = NULL;
+  //degree >= K
+  spillWorklist = NULL;
+
+  spilledNodes = NULL;
+
+  selectStack = NULL;
+  colorTab = new G::Table<TEMP::Temp, int>();
+
+  G::NodeList<TEMP::Temp> *nodes = (live.graph)->Nodes();
+  for (; nodes; nodes = nodes->tail)
+  {
+    TEMP::Temp *temp = nodes->head->NodeInfo();
+    int *color;
+    if (temp == F::F_RAX())
+      *color = 1;
+    else if (temp == F::F_RBX())
+      *color = 2;
+    else if (temp == F::F_RCX())
+      *color = 3;
+    else if (temp == F::F_RDX())
+      *color = 4;
+    else if (temp == F::F_RSI())
+      *color = 5;
+    else if (temp == F::F_RDI())
+      *color = 6;
+    else if (temp == F::F_RBP())
+      *color = 7;
+    else if (temp == F::F_R8())
+      *color = 8;
+    else if (temp == F::F_R9())
+      *color = 9;
+    else if (temp == F::F_R10())
+      *color = 10;
+    else if (temp == F::F_R11())
+      *color = 11;
+    else if (temp == F::F_R12())
+      *color = 12;
+    else if (temp == F::F_R13())
+      *color = 13;
+    else if (temp == F::F_R14())
+      *color = 14;
+    else if (temp == F::F_R15())
+      *color = 15;
+    else
+      *color = 0; //Temp register
+    colorTab->Enter(nodes->head, color);
+  }
+}
+
+static void AssignColors()
+{
+  bool okColors[K + 1];
+  spilledNodes = NULL;
+  while (selectStack)
+  {
+    okColors[0] = false;
+    for (int i = 1; i < K + 1; i++)
+    {
+      okColors[i] = true;
+    }
+
+    G::Node<TEMP::Temp> *n = selectStack->head;
+    selectStack = selectStack->tail;
+
+    for (G::NodeList<TEMP::Temp> *succs = n->Succ(); succs; succs = succs->tail)
+    {
+      int *color = colorTab->Look(succs->head);
+      okColors[*color] = false;
+    }
+
+    int i;
+    bool realSpill = true;
+    for (i = 1; i < K + 1; i++)
+    {
+      if (okColors[i])
+      {
+        realSpill = false;
+        break;
+      }
+    }
+    if (realSpill)
+    {
+      spilledNodes = new G::NodeList<TEMP::Temp>(n, spilledNodes);
+    }
+    else
+    {
+      int *color = colorTab->Look(n);
+      *color = i;
+    }
+  }
+}
+
+static void SelectSpill()
+{
+}
+
+static void Simplify()
+{
+
+  G::Node<TEMP::Temp> *node = simplifyWorklist->head;
+  simplifyWorklist = simplifyWorklist->tail;
+  //push n to stack
+  selectStack = new G::NodeList<TEMP::Temp>(node, selectStack);
+  // G_nodeList adj = Adjacent(node);
+  // for (; adj; adj = adj->tail)
+  // {
+  //   DecrementDegree(adj->head);
+  // }
+}
 } // namespace RA

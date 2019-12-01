@@ -59,8 +59,8 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
     TEMP::TempList *divident = L(F::F_RAX(), L(F::F_RDX(), NULL));
     emit(new AS::MoveInstr("movq `s0, `d0", L(F::F_RAX(), NULL), L(left, NULL)));
     emit(new AS::OperInstr("cltd", divident, L(F::F_RAX(), NULL), new AS::Targets(nullptr)));
-    emit(new AS::OperInstr("idivq `s0", divident,
-                           L(right, divident), new AS::Targets((NULL))));
+    emit(new AS::OperInstr("idivq `s0", nullptr,
+                           L(right, nullptr), new AS::Targets(NULL)));
     emit(new AS::MoveInstr("movq `s0, `d0", L(r, NULL), L(F::F_RAX(), NULL)));
     return r;
   }
@@ -83,7 +83,7 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
       emit(new AS::MoveInstr("movq `s0, `d0",
                              L(r, NULL), L(left, NULL)));
       emit(new AS::OperInstr(op + "`s0, `d0", L(r, nullptr),
-                             L(right, L(r, nullptr)), new AS::Targets((NULL))));
+                             L(right,nullptr), new AS::Targets((NULL))));
     }
     return r;
     break;
@@ -93,7 +93,7 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
     emit(new AS::MoveInstr("movq `s0, `d0",
                            L(r, NULL), L(left, NULL)));
     emit(new AS::OperInstr(op + "`s0, `d0", L(r, nullptr),
-                           L(right, L(r, nullptr)), new AS::Targets((NULL))));
+                           L(right, nullptr), new AS::Targets((NULL))));
     return r;
     break;
   }
@@ -141,7 +141,7 @@ static TEMP::Temp *munchMemExp(T::MemExp *exp)
       TEMP::Temp *lefttemp = munchExp(left);
       TEMP::Temp *righttemp = munchExp(right);
       emit(new AS::OperInstr("addq `s0,`d0", L(righttemp, NULL),
-                             L(lefttemp, L(righttemp, NULL)), new AS::Targets(NULL)));
+                             L(lefttemp, NULL), new AS::Targets(NULL)));
       emit(new AS::OperInstr("movq (`s0),`d0", L(r, NULL), L(righttemp, NULL), new AS::Targets(NULL)));
       return r;
     }
@@ -245,7 +245,7 @@ static TEMP::Temp *munchExp(T::Exp *exp)
     TEMP::Temp *t = ((T::TempExp *)exp)->temp;
     if (t == F::F_FP())
     {
-      
+
       std::string inst = "leaq " + fs + "(`s0),`d0";
       t = TEMP::Temp::NewTemp();
       emit(new AS::OperInstr(inst, L(t, NULL), L(F::F_SP(), NULL), new AS::Targets(NULL)));
