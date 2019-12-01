@@ -10,6 +10,7 @@
 #include <iostream>
 #include <sstream>
 #include <set>
+#include <map>
 namespace RA
 {
 
@@ -25,6 +26,7 @@ Result RegAlloc(F::Frame *f, AS::InstrList *il);
  
 static std::set <TEMP::Temp *>spilledNodes;
 
+static std::map <TEMP::Temp*, int> spillmap;
 } // namespace RA
 
 #endif

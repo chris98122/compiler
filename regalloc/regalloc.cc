@@ -270,18 +270,12 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
       {
 
         t = TEMP::Temp::NewTemp();
-        if (count % 6 == 1)
+        if (count % 2)
           map->Enter(t, new std::string("%r15"));
-        else if ((count % 6 == 2))
-          map->Enter(t, new std::string("%r14"));
-        else if ((count % 6 == 0))
-          map->Enter(t, new std::string("%r13"));
-        else if ((count % 6 == 3))
-          map->Enter(t, new std::string("%r12"));
-        else if ((count % 6 == 4))
-          map->Enter(t, new std::string("%r11"));
-        else if ((count % 6 == 5))
-          map->Enter(t, new std::string("%r10"));
+        else
+        { 
+          map->Enter(t, new std::string("%r13")); 
+        }
 
         printf("-------====replace temp :%d=====-----\n", t->Int());
 
@@ -292,14 +286,13 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
 
         std::string assem;
         std::stringstream ioss;
-        ioss << "# Spill load\nmovq (" + fs + "-0x" << std::hex << -off << ")(%rsp),`d0\n";
+        ioss << "#  use  Spill load\nmovq (" + fs + "-0x" << std::hex << -off << ")(%rsp),`d0\n";
 
         assem = ioss.str();
 
         //Add the new instruction betfore the old one.
         AS::OperInstr *os_instr = new AS::OperInstr(assem, new TEMP::TempList(t, nullptr), NULL, new AS::Targets(NULL));
         new_instr = new AS::InstrList(os_instr, instr);
-
         if (last)
         {
           last->tail = new_instr;
@@ -308,15 +301,31 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
         {
           il = new_instr;
         }
+
+        std::string assem_store;
+        std::stringstream ioss_store;
+        ioss_store << "# use Spill store\nmovq `s0, (" + fs + "-0x" << std::hex << -off << ")(%rsp) \n";
+
+        assem_store = ioss_store.str();
+
+        //Add the new instruction betfore the old one.
+        AS::OperInstr *os_instr_store = new AS::OperInstr(assem_store, NULL, new TEMP::TempList(t, nullptr), new AS::Targets(NULL));
+        instr->tail = new AS::InstrList(os_instr_store, next);
+
+        last = instr->tail;
       }
-      last = instr;
+      else
+      {
+
+        last = instr;
+      }
 
       if (def && intemp(def, spilltemp))
       {
         if (!t)
         {
           t = TEMP::Temp::NewTemp();
-          map->Enter(t, new std::string("%r10"));
+          map->Enter(t, new std::string("%r14"));
 
           printf("-------====replace temp :%d=====-----\n", t->Int());
         }
