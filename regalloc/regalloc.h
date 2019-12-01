@@ -26,7 +26,9 @@ Result RegAlloc(F::Frame *f, AS::InstrList *il);
  
 static std::set <TEMP::Temp *>spilledNodes;
 
-static std::map <TEMP::Temp*, int> spillmap;
+static std::map <TEMP::Temp*, std::string *> spillmap;
+
+static std::map <std::string *, int> regmap;
 } // namespace RA
 
 #endif

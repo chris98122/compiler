@@ -3,6 +3,8 @@
 namespace RA
 {
 
+void init_regmap();
+void allocate_reg(AS::InstrList *instr, TEMP::Map *map);
 void addreg(TEMP::Map *m)
 {
 
@@ -189,6 +191,7 @@ Result RegAlloc(F::Frame *f, AS::InstrList *il)
   add_temp(il);
 
   RewriteProgram(f, il, map);
+  allocate_reg(il, map);
 
   return Result(map, il);
 }
@@ -270,23 +273,14 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
       {
 
         t = TEMP::Temp::NewTemp();
-        if (count % 2)
-          map->Enter(t, new std::string("%r15"));
-        else
-        { 
-          map->Enter(t, new std::string("%r13")); 
-        }
-
         printf("-------====replace temp :%d=====-----\n", t->Int());
 
         //Replace spilledtemp by t.
         *use = *replaceTempList(use, spilltemp, t);
 
-        assert(!intemp(use, spilltemp));
-
         std::string assem;
         std::stringstream ioss;
-        ioss << "#  use  Spill load\nmovq (" + fs + "-0x" << std::hex << -off << ")(%rsp),`d0\n";
+        ioss << "#use Spill load\nmovq (" + fs + "-0x" << std::hex << -off << ")(%rsp),`d0\n";
 
         assem = ioss.str();
 
@@ -304,7 +298,7 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
 
         std::string assem_store;
         std::stringstream ioss_store;
-        ioss_store << "# use Spill store\nmovq `s0, (" + fs + "-0x" << std::hex << -off << ")(%rsp) \n";
+        ioss_store << "#use Spill store\nmovq `s0, (" + fs + "-0x" << std::hex << -off << ")(%rsp) \n";
 
         assem_store = ioss_store.str();
 
@@ -325,8 +319,6 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
         if (!t)
         {
           t = TEMP::Temp::NewTemp();
-          map->Enter(t, new std::string("%r14"));
-
           printf("-------====replace temp :%d=====-----\n", t->Int());
         }
 
@@ -354,4 +346,121 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
   *pil = *il;
 }
 
+std::string *find_reg(bool def);
+void allocate_reg(AS::InstrList *instr, TEMP::Map *map)
+{
+
+  init_regmap();
+
+  for(;instr;instr=instr->tail)
+  {
+
+    TEMP::TempList *def = nullptr, *use = nullptr;
+    switch (instr->head->kind)
+    {
+    case AS::Instr::OPER:
+      def = ((AS::OperInstr *)instr->head)->dst;
+      use = ((AS::OperInstr *)instr->head)->src;
+      break;
+    case AS::Instr::MOVE:
+      def = ((AS::MoveInstr *)instr->head)->dst;
+      use = ((AS::MoveInstr *)instr->head)->src;
+      break;
+    default:
+      def = NULL;
+      use = NULL;
+    }
+    if (def == NULL && use == NULL)
+    { 
+      continue;
+    }
+    if (instr->head->kind == AS::Instr::OPER)
+    {
+      std::string assem = ((AS::OperInstr *)instr->head)->assem;
+      if (assem.size() >= 15 && assem.substr(0, 15) == "#use Spill load")
+      {
+        while (def)
+        {
+          if (!isreg(def->head))
+          {
+            //allocate register
+            std::string *regname = find_reg(true); 
+            spillmap[def->head] = regname;
+            assert(map->Look(def->head) == NULL);
+            map->Enter(def->head, regname);
+            printf("%s Spill load allocated temp:%d\n", (*spillmap[def->head]).c_str(), def->head->Int());
+          }
+          def = def->tail;
+        } 
+        
+        continue;
+      }
+      if (assem.size() >= 16 && assem.substr(0, 16) == "#use Spill store")
+      {
+        while (use)
+        {
+          if (!isreg(use->head))
+          {
+            assert(spillmap.find(use->head) != spillmap.end());
+
+            regmap[spillmap[use->head]] = 0;
+            printf("%s free  temp:%d\n", (*spillmap[use->head]).c_str(), use->head->Int());
+          }
+          use = use->tail;
+        } 
+        continue;
+      }
+    }
+    while (def)
+    {
+      if (!isreg(def->head))
+      {
+        //allocate register
+        if (spillmap.find(def->head) != spillmap.end())
+        {
+        }
+        else
+        {
+          std::string *regname = find_reg(0);
+          assert(map->Look(def->head) == NULL);
+          map->Enter(def->head, regname);
+          printf("%s allocated temp:%d\n", (*regname).c_str(), def->head->Int());
+        }
+      }
+      def = def->tail;
+    }
+
+  }
+}
+std::string *find_reg(bool set_one)
+{
+  for (std::map<std::string *, int>::iterator iter = regmap.begin(); iter != regmap.end(); iter++)
+  {
+    if (iter->second != 1)
+    {
+      if (set_one == true)
+      {
+        iter->second = 1;
+      }
+      return iter->first;
+    }
+  }
+  assert(0);
+}
+void init_regmap()
+{ 
+  regmap[new std::string("%rbx")] = 0;
+  regmap[new std::string("%rax")] = 0;
+  regmap[new std::string("%rsi")] = 0;
+  regmap[new std::string("%rcx")] = 0; 
+  regmap[new std::string("%rdx")] = 0;
+  regmap[new std::string("%r8")] = 0;
+  regmap[new std::string("%r9")] = 0;
+  regmap[new std::string("%r10")] = 0;
+  regmap[new std::string("%r11")] = 0;
+  regmap[new std::string("%r12")] = 0;
+  regmap[new std::string("%r13")] = 0;
+  regmap[new std::string("%r14")] = 0;
+  regmap[new std::string("%r15")] = 0;
+}
 } // namespace RA

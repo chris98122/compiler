@@ -207,7 +207,7 @@ Level *Outermost()
   if (lv != nullptr)
     return lv;
 
-  lv = new Level(F::F_newFrame(TEMP::NamedLabel("tigermain") ,nullptr),nullptr);
+  lv = new Level(F::F_newFrame(TEMP::NamedLabel("tigermain"), nullptr), nullptr);
   return lv;
 }
 
@@ -234,10 +234,6 @@ F::FragList *TranslateProgram(A::Exp *root)
   //   printf("------====FRAGS=====-------\n");}
   // }
   //free memory
-
-  
-
-
 
   return frags;
 }
@@ -675,6 +671,7 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
 {
   // TODO: Put your codes here (lab5).
 
+  TEMP::Temp *limit = TEMP::Temp::NewTemp();
   TEMP::Label *incloop_label = TEMP::NewLabel();
   TEMP::Label *body_label = TEMP::NewLabel();
   TEMP::Label *done = TEMP::NewLabel();
@@ -688,10 +685,14 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
   TR::ExpAndTy high = this->hi->Translate(venv, tenv, level, label);
   TR::ExpAndTy body_ = this->body->Translate(venv, tenv, level, done);
   venv->EndScope();
+
   //i++
   T::Exp *loopvar = iter_access->access->ToExp(new T::TempExp(F::F_FP()));
   T::MoveStm *incloop = new T::MoveStm(loopvar,
                                        new T::BinopExp(T::PLUS_OP, loopvar, new T::ConstExp(1)));
+
+  T::SeqStm *init = new T::SeqStm(new T::MoveStm(loopvar, low.exp->UnEx()),
+                                  new T::MoveStm(new T::TempExp(limit), high.exp->UnEx()));
 
   /*if(i < hi) {i++; goto body;}*/
   assert(body_label);
@@ -702,10 +703,10 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
 
   T::CjumpStm *checklohi = new T::CjumpStm(T::LE_OP, low.exp->UnEx(), high.exp->UnEx(), body_label, done);
 
-  T::SeqStm *for_exp = new T::SeqStm(checklohi,
-                                     new T::SeqStm(new T::LabelStm(body_label),
-                                                   new T::SeqStm(body_.exp->UnNx(),
-                                                                 new T::SeqStm(test, new T::LabelStm(done)))));
+  T::SeqStm *for_exp = new T::SeqStm(init, new T::SeqStm(checklohi,
+                                                         new T::SeqStm(new T::LabelStm(body_label),
+                                                                       new T::SeqStm(body_.exp->UnNx(),
+                                                                                     new T::SeqStm(test, new T::LabelStm(done))))));
   return TR::ExpAndTy(new TR::NxExp(for_exp), TY::VoidTy::Instance());
 }
 
