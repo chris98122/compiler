@@ -50,7 +50,7 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
   case T::MUL_OP:
   {
     emit(new AS::MoveInstr("movq `s0, `d0", L(r, NULL), L(left, NULL)));
-    emit(new AS::OperInstr("imulq `s0", L(r, NULL), L(right, NULL), new AS::Targets(nullptr)));
+    emit(new AS::OperInstr("imulq `s0,`d0", L(r, NULL), L(right,  L(r, NULL)), new AS::Targets(nullptr)));
 
     return r;
   }
