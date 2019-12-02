@@ -222,18 +222,17 @@ F::FragList *TranslateProgram(A::Exp *root)
 
   TR::procEntryExit(main_level, mainexp.exp);
 
-  // //debug
-  // F::FragList *p = frags;
-  // while (p && p->head)
-  // {
-  //   if(p->head->kind == PROC)
-  //  { T::Stm *s = ((F::ProcFrag *)(p->head))->body;
-  //   p = p->tail;
-  //   FILE *out = stdout;
-  //   s->Print(out, 0);
-  //   printf("------====FRAGS=====-------\n");}
-  // }
-  //free memory
+  //debug
+  F::FragList *p = frags;
+  while (p && p->head)
+  {
+    if(p->head->kind == F::Frag::PROC)
+   { T::Stm *s = ((F::ProcFrag *)(p->head))->body;
+    p = p->tail;
+    FILE *out = stdout;
+    s->Print(out, 0);
+    printf("------====FRAGS=====-------\n");}
+  } 
 
   return frags;
 }
@@ -388,6 +387,8 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
 {
   // TODO: Put your codes here (lab5).
   E::EnvEntry *value = venv->Look(this->func);
+
+  TR::Level *callee = ((E::FunEntry *)value)->level;
   // TY::TyList *func_arg_type_list = ((E::FunEntry *)value)->formals;
   ExpList *arg_list = this->args;
 
@@ -398,15 +399,7 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
     TY::Ty *arg_type = arg_exp.ty;
     args = new T::ExpList(arg_exp.exp->UnEx(), args);
     arg_list = arg_list->tail;
-  }
-  // MAYBE CALL A LINKED function
-  TEMP::Label *l = TEMP::NamedLabel(this->func->Name());
-  assert(l != NULL);
-  TR::Level *callee;
-  if (value == NULL)
-    callee = new TR::Level(NULL, TR::Outermost());
-  else
-    callee = ((E::FunEntry *)value)->level;
+  } 
 
   //static_link
   //calculate static_link
@@ -417,10 +410,13 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
     //static link is the first escaped arg;
     caller = caller->parent;
   }
-  if (value != NULL)
+  if(callee->parent != NULL)
   {
+    // NOT A EXTERNALCALL
     args = new T::ExpList(staticlink, args);
   }
+
+  TEMP::Label *l = TEMP::NamedLabel(this->func->Name());
 
   TR::ExExp *exexp = new TR::ExExp(new T::CallExp(new T::NameExp(l), args));
   return TR::ExpAndTy(exexp, ((E::FunEntry *)value)->result);

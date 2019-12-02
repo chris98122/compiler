@@ -223,7 +223,7 @@ static TEMP::Temp *munchCallExp(T::CallExp *exp)
   emit(new AS::OperInstr(assem, F::F_callerSaveRegs(), nullptr, new AS::Targets(NULL)));
 
   TEMP::Temp *r = TEMP::Temp::NewTemp();
-  emit(new AS::MoveInstr("movq `s0, `d0", L(r, NULL),
+  emit(new AS::MoveInstr("#return value\nmovq `s0, `d0", L(r, NULL),
                          L(F::F_RAX(), NULL)));
 
   return r;
@@ -395,13 +395,13 @@ AS::InstrList *Codegen(F::Frame *f, T::StmList *stmList)
   // TODO: Put your codes here (lab6).
   fs = TEMP::LabelString(f->label) + "_framesize";
   instrList = NULL;
-  saveCalleeRegs();
+  //saveCalleeRegs();
   for (; stmList; stmList = stmList->tail)
   {
     munchStm(stmList->head);
   }
 
-  restoreCalleeRegs();
+  //restoreCalleeRegs();
   return F::F_procEntryExit2(instrList);
 }
 

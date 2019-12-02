@@ -22,6 +22,7 @@ void addreg(TEMP::Map *m)
   m->Enter(F::F_SP(), addr);
   addr = new std::string("%rax");
   m->Enter(F::F_RAX(), addr);
+  m->Enter(F::F_RV(), addr);
 
   addr = new std::string("%rsi");
   m->Enter(F::F_RSI(), addr);
@@ -73,7 +74,7 @@ bool isreg(TEMP::Temp *t)
 
     return true;
   }
-  if (t == F::F_RAX())
+  if (t == F::F_RAX() || t == F::F_RV())
   {
     std::string *addr = new std::string("%rax");
 
@@ -455,12 +456,6 @@ std::string *find_reg(bool set_one)
 }
 void init_regmap()
 {
-
-  regmap[new std::string("%rbx")] = 0;
-  regmap[new std::string("%rax")] = 0;
-  regmap[new std::string("%rsi")] = 0;
-  regmap[new std::string("%rcx")] = 0;
-  regmap[new std::string("%rdx")] = 0;
   regmap[new std::string("%r8")] = 0;
   regmap[new std::string("%r9")] = 0;
   regmap[new std::string("%r10")] = 0;
@@ -469,5 +464,12 @@ void init_regmap()
   regmap[new std::string("%r13")] = 0;
   regmap[new std::string("%r14")] = 0;
   regmap[new std::string("%r15")] = 0;
+
+  regmap[new std::string("%rdi")] = 0;
+
+  regmap[new std::string("%rbx")] = 0;
+  regmap[new std::string("%rsi")] = 0;
+  regmap[new std::string("%rcx")] = 0;
+  regmap[new std::string("%rdx")] = 0;
 }
 } // namespace RA
