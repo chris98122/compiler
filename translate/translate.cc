@@ -306,6 +306,7 @@ TR::ExpAndTy FieldVar::Translate(S::Table<E::EnvEntry> *venv,
   {
     assert(0);
   }
+  assert(((E::VarEntry *)var)->ty->kind == TY::Ty::RECORD);
   TY::FieldList *f = ((TY::RecordTy *)((E::VarEntry *)var)->ty)->fields;
   while (f && f->head)
   {
@@ -318,9 +319,10 @@ TR::ExpAndTy FieldVar::Translate(S::Table<E::EnvEntry> *venv,
   }
   // get the record var access
   TR::ExpAndTy var_exp_ty = this->var->Translate(venv, tenv, level, label);
+  assert(var_exp_ty.exp->kind == TR::Exp::EX);
 
-  TR::ExExp *frame = (TR::ExExp *)(var_exp_ty.exp);
-  T::MemExp *fieldvar_mem = new T::MemExp(new T::BinopExp(T::PLUS_OP, frame->UnEx(), new T::ConstExp(order * wordsize))); //static link is the first escaped arg;
+  TR::ExExp *access = (TR::ExExp *)(var_exp_ty.exp);
+  T::MemExp *fieldvar_mem = new T::MemExp(new T::BinopExp(T::PLUS_OP, access->UnEx(), new T::ConstExp(order * wordsize))); //static link is the first escaped arg;
 
   return TR::ExpAndTy(new TR::ExExp(fieldvar_mem), var_exp_ty.ty);
 }

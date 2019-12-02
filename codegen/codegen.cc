@@ -71,7 +71,7 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
       int rightvalue = ((T::ConstExp *)(exp->right))->consti;
       std::string instr;
       std::stringstream ioss;
-      ioss << "leaq (" + fs + "-0x" << std::hex << rightvalue << ")(`s0),`d0";
+      ioss << "leaq (" + fs + "-0x" << std::hex << -rightvalue << ")(`s0),`d0";
 
       instr = ioss.str();
       emit(new AS::OperInstr(instr,
@@ -130,7 +130,7 @@ static TEMP::Temp *munchMemExp(T::MemExp *exp)
       int offset = ((T::ConstExp *)right)->consti;
       std::string instr;
       std::stringstream ioss;
-      ioss << "movq (" + fs + "-" << std::hex << -offset << ")(`s0),`d0";
+      ioss << "movq (" + fs + "-0x" << std::hex << -offset << ")(`s0),`d0";
 
       instr = ioss.str();
       emit(new AS::OperInstr(instr,
