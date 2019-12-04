@@ -16,6 +16,7 @@
 namespace TR
 {
 
+TR::Exp *Tr_Seq(TR::Exp *left, TR::Exp *right);
 static F::FragList *frags = new F::FragList(nullptr, nullptr);
 void addfrag(F::Frag *frag)
 {
@@ -226,13 +227,16 @@ F::FragList *TranslateProgram(A::Exp *root)
   F::FragList *p = frags;
   while (p && p->head)
   {
-    if(p->head->kind == F::Frag::PROC)
-   { T::Stm *s = ((F::ProcFrag *)(p->head))->body;
+    if (p->head->kind == F::Frag::PROC)
+    {
+      T::Stm *s = ((F::ProcFrag *)(p->head))->body;
+      FILE *out = stdout;
+      s->Print(out, 0);
+      printf("------====FRAGS=====-------\n");
+    }
+
     p = p->tail;
-    FILE *out = stdout;
-    s->Print(out, 0);
-    printf("------====FRAGS=====-------\n");}
-  } 
+  }
 
   return frags;
 }
@@ -267,6 +271,20 @@ Level *Level::NewLevel(Level *parent, TEMP::Label *name,
   return level;
 }
 
+TR::Exp *Tr_Seq(TR::Exp *left, TR::Exp *right)
+{
+  /*Don't handle the situation where left is NULL*/
+  T::Exp *e;
+  if (right)
+  {
+    e = new T::EseqExp(left->UnNx(), right->UnEx());
+  }
+  else
+  {
+    e = new T::EseqExp(left->UnNx(), new T::ConstExp(0));
+  }
+  return new TR::ExExp(e);
+}
 } // namespace TR
 
 namespace A
@@ -352,7 +370,7 @@ TR::ExpAndTy VarExp::Translate(S::Table<E::EnvEntry> *venv,
                                TEMP::Label *label) const
 {
   // TODO: Put your codes here (lab5).
-  return var->Translate(venv, tenv, level, label);
+  return this->var->Translate(venv, tenv, level, label);
 }
 
 TR::ExpAndTy NilExp::Translate(S::Table<E::EnvEntry> *venv,
@@ -404,7 +422,7 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
     TY::Ty *arg_type = arg_exp.ty;
     args = new T::ExpList(arg_exp.exp->UnEx(), args);
     arg_list = arg_list->tail;
-  } 
+  }
 
   //static_link
   //calculate static_link
@@ -415,7 +433,7 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
     //static link is the first escaped arg;
     caller = caller->parent;
   }
-  if(callee->parent != NULL)
+  if (callee->parent != NULL)
   {
     // NOT A EXTERNALCALL
     args = new T::ExpList(staticlink, args);
@@ -535,22 +553,7 @@ TR::ExpAndTy RecordExp::Translate(S::Table<E::EnvEntry> *venv,
   stm = new T::SeqStm(stm, Tr_mk_record_array(h->tail, new T::TempExp(r), 0, count));
   return TR::ExpAndTy(new TR::ExExp(new T::EseqExp(stm, new T::TempExp(r))), record);
 }
-
-TR::ExExp *Tr_Seq(TR::Exp *left, TR::Exp *right)
-{
-  /*Don't handle the situation where left is NULL*/
-  T::EseqExp *e;
-  if (right)
-  {
-    e = new T::EseqExp(left->UnNx(), right->UnEx());
-  }
-  else
-  {
-    assert(0);
-  }
-  return new TR::ExExp(e);
-}
-
+ 
 TR::ExpAndTy SeqExp::Translate(S::Table<E::EnvEntry> *venv,
                                S::Table<TY::Ty> *tenv, TR::Level *level,
                                TEMP::Label *label) const
@@ -566,7 +569,7 @@ TR::ExpAndTy SeqExp::Translate(S::Table<E::EnvEntry> *venv,
     TR::ExpAndTy expandty = exp->Translate(venv, tenv, level, label);
 
     result = expandty.ty;
-    trexp = Tr_Seq(trexp, expandty.exp);
+    trexp = TR::Tr_Seq(trexp, expandty.exp);
     explist = explist->tail;
   }
   return TR::ExpAndTy(trexp, result);
@@ -687,7 +690,6 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
   TR::ExpAndTy low = this->lo->Translate(venv, tenv, level, label);
   TR::ExpAndTy high = this->hi->Translate(venv, tenv, level, label);
   TR::ExpAndTy body_ = this->body->Translate(venv, tenv, level, done);
-  venv->EndScope();
 
   //i++
   T::Exp *loopvar = iter_access->access->ToExp(new T::TempExp(F::F_FP()));
@@ -710,6 +712,7 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
                                                          new T::SeqStm(new T::LabelStm(body_label),
                                                                        new T::SeqStm(body_.exp->UnNx(),
                                                                                      new T::SeqStm(test, new T::LabelStm(done))))));
+  venv->EndScope();
   return TR::ExpAndTy(new TR::NxExp(for_exp), TY::VoidTy::Instance());
 }
 
@@ -723,6 +726,7 @@ TR::ExpAndTy BreakExp::Translate(S::Table<E::EnvEntry> *venv,
   return TR::ExpAndTy(new TR::NxExp(breakexp), TY::VoidTy::Instance());
 }
 
+
 TR::ExpAndTy LetExp::Translate(S::Table<E::EnvEntry> *venv,
                                S::Table<TY::Ty> *tenv, TR::Level *level,
                                TEMP::Label *label) const
@@ -733,20 +737,19 @@ TR::ExpAndTy LetExp::Translate(S::Table<E::EnvEntry> *venv,
   tenv->BeginScope();
   DecList *iter = this->decs;
 
-  T::SeqStm *seqstm = NULL;
+  TR::Exp *trSeq = TR::Nil();
   while (iter && iter->head)
   {
     TR::Exp *dec_exp = (iter->head)->Translate(venv, tenv, level, label);
-    seqstm = new T::SeqStm(dec_exp->UnNx(), seqstm);
+    trSeq = TR::Tr_Seq(trSeq, dec_exp);
     iter = iter->tail;
-  }
-  seqstm->right = new T::ExpStm(new T::ConstExp(0));
-  assert(seqstm && seqstm->right);
+  } 
+
   TR::ExpAndTy body_exp = this->body->Translate(venv, tenv, level, label);
-  TR::ExExp *r = new TR::ExExp(new T::EseqExp(seqstm, body_exp.exp->UnEx()));
+  TR::Exp *trlet = Tr_Seq(trSeq, body_exp.exp);
   tenv->EndScope();
   venv->EndScope();
-  return TR::ExpAndTy(r, body_exp.ty);
+  return TR::ExpAndTy(trlet, body_exp.ty);
 }
 
 TR::ExpAndTy ArrayExp::Translate(S::Table<E::EnvEntry> *venv,
