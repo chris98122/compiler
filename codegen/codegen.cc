@@ -161,7 +161,7 @@ static TEMP::Temp *munchMemExp(T::MemExp *exp)
 static TEMP::Temp *munchNameExp(T::NameExp *exp)
 {
   TEMP::Temp *r = TEMP::Temp::NewTemp();
-  std::string assem = "movq $" + exp->name->Name() + ",`d0";
+  std::string assem = "leaq " + exp->name->Name() + "(%rip),`d0";
   emit(new AS::OperInstr(assem,
                          L(r, NULL), NULL, new AS::Targets(nullptr)));
   return r;
@@ -391,12 +391,21 @@ static void restoreCalleeRegs(void)
   emit(new AS::MoveInstr("movq `s0,`d0", L(F::F_R15(), NULL), L(savedr15, NULL)));
 }
 
+void pushreg(F::Frame *f)
+{
+  F::AccessList *formal= f->formals;
+  while(formal && formal->head)
+  {
+    formal=formal->tail;
+  }
+}
 AS::InstrList *Codegen(F::Frame *f, T::StmList *stmList)
 {
   // TODO: Put your codes here (lab6).
   fs = TEMP::LabelString(f->label) + "_framesize";
   instrList = NULL;
   //saveCalleeRegs();
+  //push reg in stack
   for (; stmList; stmList = stmList->tail)
   {
     munchStm(stmList->head);

@@ -840,7 +840,7 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
 
     F::Frame *frame = func_level->frame;
     F::AccessList *formal_accesslist = frame->formals;
-    // local variable enter the venv
+    //formal enter the venv
     for (l = f->params, t = formalTys; l; l = l->tail, t = t->tail)
     {
       venv->Enter(l->head->name, new E::VarEntry(
@@ -869,9 +869,8 @@ TR::Exp *VarDec::Translate(S::Table<E::EnvEntry> *venv, S::Table<TY::Ty> *tenv,
     type_of_var = tenv->Look(this->typ);
   else
     type_of_var = init_exp.ty;
-
-  F::Frame *frame = F::F_newFrame(this->var, new U::BoolList(this->escape, NULL));
-  F::Access *varaccess = F::F_allocLocal(frame, this->escape);
+ 
+  F::Access *varaccess = F::F_allocLocal(level->frame, this->escape);
 
   E::VarEntry *entry = new E::VarEntry(new TR::Access(level, varaccess), type_of_var, false);
   venv->Enter(this->var, entry);

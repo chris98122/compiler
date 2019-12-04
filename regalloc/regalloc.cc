@@ -471,13 +471,12 @@ void init_regmap()
   regmap[new std::string("%r12")] = 0;
   regmap[new std::string("%r13")] = 0;
   regmap[new std::string("%r14")] = 0;
-  regmap[new std::string("%r15")] = 0;
-
-  regmap[new std::string("%rdi")] = 0;
-
+  regmap[new std::string("%r15")] = 0; 
   regmap[new std::string("%rbx")] = 0;
-  regmap[new std::string("%rsi")] = 0;
   regmap[new std::string("%rcx")] = 0;
   regmap[new std::string("%rdx")] = 0;
+  regmap[new std::string("%rax")] = 0;
+  regmap[new std::string("%rdi")] = 0; 
+  regmap[new std::string("%rsi")] = 0;
 }
 } // namespace RA
