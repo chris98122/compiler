@@ -324,7 +324,10 @@ TR::ExpAndTy FieldVar::Translate(S::Table<E::EnvEntry> *venv,
   TR::ExExp *access = (TR::ExExp *)(var_exp_ty.exp);
   T::MemExp *fieldvar_mem = new T::MemExp(new T::BinopExp(T::PLUS_OP, access->UnEx(), new T::ConstExp(order * wordsize))); //static link is the first escaped arg;
 
-  return TR::ExpAndTy(new TR::ExExp(fieldvar_mem), var_exp_ty.ty);
+  // TEMP::Temp * fv =TEMP::Temp::NewTemp();
+  // T::MoveStm *fieldvar = new T::MoveStm(new T::TempExp(fv) ,fieldvar_mem );
+
+  return TR::ExpAndTy(new TR::ExExp(fieldvar_mem), f->head->ty);
 }
 
 TR::ExpAndTy SubscriptVar::Translate(S::Table<E::EnvEntry> *venv,

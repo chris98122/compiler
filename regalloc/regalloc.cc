@@ -311,7 +311,15 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
         assem_store = ioss_store.str();
 
         //Add the new instruction betfore the old one.
-        AS::OperInstr *os_instr_store = new AS::OperInstr(assem_store, NULL, new TEMP::TempList(t, nullptr), new AS::Targets(NULL));
+        AS::OperInstr *os_instr_store;
+        if (instr->head->kind == AS::Instr::MOVE && ((AS::MoveInstr *)instr->head)->assem == "movq `s0, (`s1)")
+        {
+          os_instr_store = new AS::OperInstr(assem_store, NULL, new TEMP::TempList(use->head, nullptr), new AS::Targets(NULL));
+        }
+        else
+        {
+          os_instr_store = new AS::OperInstr(assem_store, NULL, new TEMP::TempList(t, nullptr), new AS::Targets(NULL));
+        }
         instr->tail = new AS::InstrList(os_instr_store, next);
 
         last = instr->tail;
