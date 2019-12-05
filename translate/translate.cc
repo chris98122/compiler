@@ -415,14 +415,16 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
   // TY::TyList *func_arg_type_list = ((E::FunEntry *)value)->formals;
   ExpList *arg_list = this->args;
 
-  T::ExpList *args = NULL; //make T::ExpList
-  while (arg_list && arg_list->head)
+  T::ExpList *targs = new T::ExpList(NULL, NULL);
+  T::ExpList *tail = targs;
+
+  for (; arg_list; arg_list = arg_list->tail)
   {
-    TR::ExpAndTy arg_exp = arg_list->head->Translate(venv, tenv, caller, label);
-    TY::Ty *arg_type = arg_exp.ty;
-    args = new T::ExpList(arg_exp.exp->UnEx(), args);
-    arg_list = arg_list->tail;
+    TR::ExpAndTy argval = arg_list->head->Translate(venv,tenv,caller,label);
+    tail->tail = new T::ExpList(argval.exp->UnEx(), NULL);
+    tail = tail->tail;
   }
+  targs = targs->tail;
 
   //static_link
   //calculate static_link
@@ -436,12 +438,20 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
   if (callee->parent != NULL)
   {
     // NOT A EXTERNALCALL
-    args = new T::ExpList(staticlink, args);
+    targs = new T::ExpList(staticlink, targs);
   }
 
   TEMP::Label *l = TEMP::NamedLabel(this->func->Name());
 
-  TR::ExExp *exexp = new TR::ExExp(new T::CallExp(new T::NameExp(l), args));
+  T::CallExp *callexp = new T::CallExp(new T::NameExp(l), targs);
+  TR::ExExp *exexp = new TR::ExExp(callexp);
+
+  // //debug
+
+  FILE *out = stdout;
+  callexp->Print(out, 10);
+
+  // //debug
   return TR::ExpAndTy(exexp, ((E::FunEntry *)value)->result);
 }
 
@@ -553,7 +563,7 @@ TR::ExpAndTy RecordExp::Translate(S::Table<E::EnvEntry> *venv,
   stm = new T::SeqStm(stm, Tr_mk_record_array(h->tail, new T::TempExp(r), 0, count));
   return TR::ExpAndTy(new TR::ExExp(new T::EseqExp(stm, new T::TempExp(r))), record);
 }
- 
+
 TR::ExpAndTy SeqExp::Translate(S::Table<E::EnvEntry> *venv,
                                S::Table<TY::Ty> *tenv, TR::Level *level,
                                TEMP::Label *label) const
@@ -726,7 +736,6 @@ TR::ExpAndTy BreakExp::Translate(S::Table<E::EnvEntry> *venv,
   return TR::ExpAndTy(new TR::NxExp(breakexp), TY::VoidTy::Instance());
 }
 
-
 TR::ExpAndTy LetExp::Translate(S::Table<E::EnvEntry> *venv,
                                S::Table<TY::Ty> *tenv, TR::Level *level,
                                TEMP::Label *label) const
@@ -743,7 +752,7 @@ TR::ExpAndTy LetExp::Translate(S::Table<E::EnvEntry> *venv,
     TR::Exp *dec_exp = (iter->head)->Translate(venv, tenv, level, label);
     trSeq = TR::Tr_Seq(trSeq, dec_exp);
     iter = iter->tail;
-  } 
+  }
 
   TR::ExpAndTy body_exp = this->body->Translate(venv, tenv, level, label);
   TR::Exp *trlet = Tr_Seq(trSeq, body_exp.exp);
@@ -787,6 +796,15 @@ static TY::TyList *make_formal_tylist(S::Table<TY::Ty> *tenv, A::FieldList *para
 
   return new TY::TyList(ty->ActualTy(), make_formal_tylist(tenv, params->tail));
 }
+
+U::BoolList *makeFormalEscList(A::FieldList *params)
+{
+  if (params == NULL)
+  {
+    return NULL;
+  }
+  return new U::BoolList(params->head->escape, makeFormalEscList(params->tail));
+}
 TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
                                 S::Table<TY::Ty> *tenv, TR::Level *level,
                                 TEMP::Label *label) const
@@ -796,9 +814,11 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
 
   FunDecList *fd = this->functions;
   //First loop:push function names into venv to handle recursive function
+
   while (fd && fd->head)
   {
     FunDec *f = fd->head;
+
     TY::Ty *resultTy;
     if (f->result)
     {
@@ -808,13 +828,8 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
     {
       resultTy = TY::VoidTy::Instance();
     }
-    A::FieldList *p = f->params;
-    U::BoolList *args = NULL;
-    while (p && p->head)
-    {
-      args = new U::BoolList(true, args); //Assume that all params are escaped.
-      p = p->tail;
-    }
+    U::BoolList *args = makeFormalEscList(f->params);
+
     TR::Level *newlevel = TR::Level::NewLevel(level, TEMP::NamedLabel(f->name->Name()), args);
     TY::TyList *formalTys = make_formal_tylist(tenv, f->params);
     TEMP::Label *func_label = TEMP::NamedLabel(f->name->Name());
@@ -841,6 +856,11 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
     F::Frame *frame = func_level->frame;
     F::AccessList *formal_accesslist = frame->formals;
     //formal enter the venv
+
+    // //DEBUG
+    //    FILE *out = stdout;
+    //    A::FieldList::Print(out, f->params, 10);
+    // //DEBUG
     for (l = f->params, t = formalTys; l; l = l->tail, t = t->tail)
     {
       venv->Enter(l->head->name, new E::VarEntry(
@@ -869,7 +889,7 @@ TR::Exp *VarDec::Translate(S::Table<E::EnvEntry> *venv, S::Table<TY::Ty> *tenv,
     type_of_var = tenv->Look(this->typ);
   else
     type_of_var = init_exp.ty;
- 
+
   F::Access *varaccess = F::F_allocLocal(level->frame, this->escape);
 
   E::VarEntry *entry = new E::VarEntry(new TR::Access(level, varaccess), type_of_var, false);

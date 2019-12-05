@@ -170,6 +170,8 @@ static void munchArgs(T::ExpList *list)
 {
   int num = 1;
   TEMP::Temp *arg = TEMP::Temp::NewTemp();
+
+  
   for (T::ExpList *l = list; l; l = l->tail, num++)
   {
     arg = munchExp(l->head);
@@ -389,16 +391,7 @@ static void restoreCalleeRegs(void)
   emit(new AS::MoveInstr("movq `s0,`d0", L(F::F_R13(), NULL), L(savedr13, NULL)));
   emit(new AS::MoveInstr("movq `s0,`d0", L(F::F_R14(), NULL), L(savedr14, NULL)));
   emit(new AS::MoveInstr("movq `s0,`d0", L(F::F_R15(), NULL), L(savedr15, NULL)));
-}
-
-void pushreg(F::Frame *f)
-{
-  F::AccessList *formal= f->formals;
-  while(formal && formal->head)
-  {
-    formal=formal->tail;
-  }
-}
+} 
 AS::InstrList *Codegen(F::Frame *f, T::StmList *stmList)
 {
   // TODO: Put your codes here (lab6).
