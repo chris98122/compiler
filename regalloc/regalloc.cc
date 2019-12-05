@@ -199,7 +199,7 @@ Result RegAlloc(F::Frame *f, AS::InstrList *il)
   add_temp(il);
 
   RewriteProgram(f, il, map);
-  allocate_reg(il, map);
+  allocate_reg(il, map); 
 
   return Result(map, il);
 }
@@ -314,7 +314,7 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
         AS::OperInstr *os_instr_store;
         if (instr->head->kind == AS::Instr::MOVE && ((AS::MoveInstr *)instr->head)->assem == "movq `s0, (`s1)")
         {
-          os_instr_store = new AS::OperInstr(assem_store, NULL, new TEMP::TempList(use->head, nullptr), new AS::Targets(NULL));
+          os_instr_store = new AS::OperInstr("#no need reg"+assem_store, NULL, new TEMP::TempList(use->head, nullptr), new AS::Targets(NULL));
         }
         else
         {
@@ -399,7 +399,7 @@ void allocate_reg(AS::InstrList *instr, TEMP::Map *map)
         {
           if (!isreg(def->head))
           {
-            //allocate register
+            //allocate register 
             std::string *regname = find_reg(true);
             spillmap[def->head] = regname;
             assert(map->Look(def->head) == NULL);

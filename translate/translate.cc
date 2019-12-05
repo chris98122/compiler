@@ -686,7 +686,7 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
 
   venv->BeginScope();
   E::VarEntry *iterator = new E::VarEntry(iter_access, TY::IntTy::Instance(), true);
-  venv->Enter(var, iterator);
+  venv->Enter(this->var, iterator);
   TR::ExpAndTy low = this->lo->Translate(venv, tenv, level, label);
   TR::ExpAndTy high = this->hi->Translate(venv, tenv, level, label);
   TR::ExpAndTy body_ = this->body->Translate(venv, tenv, level, done);
