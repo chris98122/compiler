@@ -282,6 +282,12 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
 
 T::Stm *F_procEntryExit1(Frame *frame, T::Stm *stm)
 {
+  //debug
+  FILE *out = stdout;
+  frame->view_shift->Print(out);
+
+  printf("------====view_shift=====-------\n");
+
   T::StmList *iter = frame->view_shift;
   T::SeqStm *res = new T::SeqStm(stm, new T::ExpStm(new T::ConstExp(0)));
   while (iter && iter->head)
@@ -312,7 +318,7 @@ AS::Proc *F_procEntryExit3(Frame *frame, AS::InstrList *inst)
   prolog = ioss.str();
 
   std::stringstream ios;
-  ios << "addq $0x"<< std::hex << -frame->s_offset << ",%rsp\nret\n\n";
+  ios << "addq $0x" << std::hex << -frame->s_offset << ",%rsp\nret\n\n";
 
   std::string epilog = ios.str();
   return new AS::Proc(prolog, inst, epilog);

@@ -446,12 +446,7 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
   T::CallExp *callexp = new T::CallExp(new T::NameExp(l), targs);
   TR::ExExp *exexp = new TR::ExExp(callexp);
 
-  // //debug
-
-  FILE *out = stdout;
-  callexp->Print(out, 10);
-
-  // //debug
+  
   return TR::ExpAndTy(exexp, ((E::FunEntry *)value)->result);
 }
 

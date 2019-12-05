@@ -50,7 +50,7 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
   case T::MUL_OP:
   {
     emit(new AS::MoveInstr("movq `s0, `d0", L(r, NULL), L(left, NULL)));
-    emit(new AS::OperInstr("imulq `s0,`d0", L(r, NULL), L(right, L(r, NULL)), new AS::Targets(nullptr)));
+    emit(new AS::OperInstr("imulq `s0,`d0", L(r, NULL), L(right, NULL), new AS::Targets(nullptr)));
 
     return r;
   }
@@ -58,9 +58,9 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
   {
     TEMP::TempList *divident = L(F::F_RAX(), L(F::F_RDX(), NULL));
     emit(new AS::MoveInstr("movq `s0, `d0", L(F::F_RAX(), NULL), L(left, NULL)));
-    emit(new AS::OperInstr("cltd", divident, L(F::F_RAX(), NULL), new AS::Targets(nullptr)));
-    emit(new AS::OperInstr("idivq `s0", divident,
-                           L(right, divident), new AS::Targets((NULL))));
+    emit(new AS::OperInstr("cltd", NULL, NULL, new AS::Targets(nullptr)));
+    emit(new AS::OperInstr("idivq `s0", NULL,
+                           L(right,NULL), new AS::Targets((NULL))));
     emit(new AS::MoveInstr("movq `s0, `d0", L(r, NULL), L(F::F_RAX(), NULL)));
     return r;
   }

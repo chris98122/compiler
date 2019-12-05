@@ -191,6 +191,19 @@ static void add_temp(AS::InstrList *instr)
 }
 
 static void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map);
+
+void regmap_setone(std::string s)
+{
+  for (std::map<std::string *, int>::iterator iter = regmap.begin(); iter != regmap.end(); iter++)
+  {
+    if (*(iter->first) == s)
+    {
+      iter->second = 1;
+      return;
+    }
+  }
+}
+
 Result RegAlloc(F::Frame *f, AS::InstrList *il)
 {
   // TODO: Put your codes here (lab6).
@@ -199,7 +212,7 @@ Result RegAlloc(F::Frame *f, AS::InstrList *il)
   add_temp(il);
 
   RewriteProgram(f, il, map);
-  allocate_reg(il, map); 
+  allocate_reg(il, map);
 
   return Result(map, il);
 }
@@ -281,9 +294,21 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
       {
 
         t = TEMP::Temp::NewTemp();
+        //  debug
+        if (instr->head->kind == AS::Instr::OPER)
+        {
+          std::string assem = ((AS::OperInstr *)instr->head)->assem;
+          printf("%s \n ", assem.c_str() );
+        }
+        if (instr->head->kind == AS::Instr::MOVE)
+        {
+          std::string assem = ((AS::MoveInstr *)instr->head)->assem;
+          printf("%s \n ", assem.c_str());
+        }
         printf("-------====replace temp :%d=====-----\n", t->Int());
 
         //Replace spilledtemp by t.
+
         *use = *replaceTempList(use, spilltemp, t);
 
         std::string assem;
@@ -314,13 +339,22 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
         AS::OperInstr *os_instr_store;
         if (instr->head->kind == AS::Instr::MOVE && ((AS::MoveInstr *)instr->head)->assem == "movq `s0, (`s1)")
         {
-          os_instr_store = new AS::OperInstr("#no need reg"+assem_store, NULL, new TEMP::TempList(use->head, nullptr), new AS::Targets(NULL));
+          if (t == use->head)
+          {
+            os_instr_store = new AS::OperInstr(assem_store, NULL, new TEMP::TempList(use->head, nullptr), new AS::Targets(NULL));
+          }
+          else
+          {
+            os_instr_store = new AS::OperInstr("#free t" + assem_store, NULL,
+                                               new TEMP::TempList(use->head, new TEMP::TempList(t, nullptr)), new AS::Targets(NULL));
+          }
         }
         else
         {
           os_instr_store = new AS::OperInstr(assem_store, NULL, new TEMP::TempList(t, nullptr), new AS::Targets(NULL));
         }
         instr->tail = new AS::InstrList(os_instr_store, next);
+        next = instr->tail;
 
         last = instr->tail;
       }
@@ -335,7 +369,7 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil, TEMP::Map *map)
         if (!t)
         {
           t = TEMP::Temp::NewTemp();
-          printf("-------====replace temp :%d=====-----\n", t->Int());
+          printf("-------====DEF replace temp :%d=====-----\n", t->Int());
         }
 
         *def = *replaceTempList(def, spilltemp, t);
@@ -399,7 +433,7 @@ void allocate_reg(AS::InstrList *instr, TEMP::Map *map)
         {
           if (!isreg(def->head))
           {
-            //allocate register 
+            //allocate register
             std::string *regname = find_reg(true);
             spillmap[def->head] = regname;
             assert(map->Look(def->head) == NULL);
@@ -426,9 +460,21 @@ void allocate_reg(AS::InstrList *instr, TEMP::Map *map)
         }
         continue;
       }
+      if (assem.size() >= 7 && assem.substr(0, 7) == "#free t")
+      {
+        assert(use->tail->head);
+        regmap[spillmap[use->tail->head]] = 0;
+        printf("%s #free t temp:%d\n", (*spillmap[use->tail->head]).c_str(), use->tail->head->Int());
+
+        continue;
+      }
     }
+
     while (def)
     {
+
+      //debug
+
       if (!isreg(def->head))
       {
         //allocate register
@@ -437,16 +483,28 @@ void allocate_reg(AS::InstrList *instr, TEMP::Map *map)
         }
         else
         {
+          //debug
+          // if (instr->head->kind == AS::Instr::OPER)
+          // {
+          //   std::string assem = ((AS::OperInstr *)instr->head)->assem;
+          //   printf("%s temp: %d\n ", assem.c_str(), def->head->Int());
+          // }
+          // if (instr->head->kind == AS::Instr::MOVE)
+          // {
+          //   std::string assem = ((AS::MoveInstr *)instr->head)->assem;
+          //   printf("%s temp: %d\n ", assem.c_str(), def->head->Int());
+          // }
+
           std::string *regname = find_reg(0);
           assert(map->Look(def->head) == NULL);
           map->Enter(def->head, regname);
-          printf("%s allocated temp:%d\n", (*regname).c_str(), def->head->Int());
+          // printf("%s allocated temp: %d  \n", (*regname).c_str(), def->head->Int());
         }
       }
       def = def->tail;
     }
   }
-}
+} // namespace RA
 std::string *find_reg(bool set_one)
 {
   for (std::map<std::string *, int>::iterator iter = regmap.begin(); iter != regmap.end(); iter++)
@@ -471,12 +529,8 @@ void init_regmap()
   regmap[new std::string("%r12")] = 0;
   regmap[new std::string("%r13")] = 0;
   regmap[new std::string("%r14")] = 0;
-  regmap[new std::string("%r15")] = 0; 
+  regmap[new std::string("%r15")] = 0;
   regmap[new std::string("%rbx")] = 0;
-  regmap[new std::string("%rcx")] = 0;
-  regmap[new std::string("%rdx")] = 0;
-  regmap[new std::string("%rax")] = 0;
-  regmap[new std::string("%rdi")] = 0; 
-  regmap[new std::string("%rsi")] = 0;
+
 }
 } // namespace RA
