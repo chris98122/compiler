@@ -522,8 +522,6 @@ std::string *find_reg(bool set_one)
 }
 void init_regmap()
 {
-  regmap[new std::string("%r8")] = 0;
-  regmap[new std::string("%r9")] = 0;
   regmap[new std::string("%r10")] = 0;
   regmap[new std::string("%r11")] = 0;
   regmap[new std::string("%r12")] = 0;

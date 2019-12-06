@@ -229,15 +229,16 @@ F::FragList *TranslateProgram(A::Exp *root)
   {
     if (p->head->kind == F::Frag::PROC)
     {
+
+      printf("------====FRAG:%s=====-------\n",
+             ((F::ProcFrag *)(p->head))->frame->label->Name().c_str());
       T::Stm *s = ((F::ProcFrag *)(p->head))->body;
       FILE *out = stdout;
       s->Print(out, 0);
-      printf("------====FRAGS=====-------\n");
     }
 
     p = p->tail;
   }
-
   return frags;
 }
 
@@ -360,8 +361,7 @@ TR::ExpAndTy SubscriptVar::Translate(S::Table<E::EnvEntry> *venv,
   TR::ExExp *frame = (TR::ExExp *)(var_exp_ty.exp);
   T::MemExp *subvar_mem = new T::MemExp(new T::BinopExp(T::PLUS_OP, frame->UnEx(),
                                                         new T::BinopExp(T::MUL_OP, subscript_exp_ty.exp->UnEx(), new T::ConstExp(wordsize)))); //static link is the first escaped arg;
-
-  // wrong  to do
+ 
   return TR::ExpAndTy(new TR::ExExp(subvar_mem), var_exp_ty.ty);
 }
 
@@ -420,7 +420,7 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
 
   for (; arg_list; arg_list = arg_list->tail)
   {
-    TR::ExpAndTy argval = arg_list->head->Translate(venv,tenv,caller,label);
+    TR::ExpAndTy argval = arg_list->head->Translate(venv, tenv, caller, label);
     tail->tail = new T::ExpList(argval.exp->UnEx(), NULL);
     tail = tail->tail;
   }
@@ -446,7 +446,6 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
   T::CallExp *callexp = new T::CallExp(new T::NameExp(l), targs);
   TR::ExExp *exexp = new TR::ExExp(callexp);
 
-  
   return TR::ExpAndTy(exexp, ((E::FunEntry *)value)->result);
 }
 
@@ -457,16 +456,15 @@ TR::ExpAndTy OpExp::Translate(S::Table<E::EnvEntry> *venv,
   // TODO: Put your codes here (lab5).
   TR::ExpAndTy leftexp_ty = this->left->Translate(venv, tenv, level, label);
   T::Exp *leftexp, *rightexp;
+
+  leftexp = leftexp_ty.exp->UnEx();
+
+  rightexp = this->right->Translate(venv, tenv, level, label).exp->UnEx();
   if (this->oper == A::EQ_OP && leftexp_ty.ty->kind == TY::Ty::STRING)
   {
     //SHOULD USE STRINGEQUAL
     leftexp = F::F_externalCall("stringEqual", new T::ExpList(leftexp, new T::ExpList(rightexp, NULL)));
     rightexp = new T::ConstExp(1);
-  }
-  else
-  {
-    leftexp = leftexp_ty.exp->UnEx();
-    rightexp = this->right->Translate(venv, tenv, level, label).exp->UnEx();
   }
   switch (this->oper)
   {
