@@ -2,18 +2,63 @@
 
 namespace RA
 {
+static bool precolor(G::Node<TEMP::Temp> *n)
+{
+  return *(colorTab->Look(n));
+}
 
-static void RewriteProgram(F::Frame *f, AS::InstrList *pil);
+static int degree(G::Node<TEMP::Temp> *n)
+{
+  return *(degreeTab->Look(n));
+}
+static LIVE::MoveList *movelist(G::Node<TEMP::Temp> *n)
+{
+  return moveListTab->Look(n);
+}
 
-static void AssignColors();
+//Use George to check if v can be combined by u
+static bool OK(G::Node<TEMP::Temp> *v, G::Node<TEMP::Temp> *u)
+{
+  bool ok = true;
+  for (G::NodeList<TEMP::Temp> *adj = v->Adj(); adj; adj = adj->tail)
+  {
+    G::Node<TEMP::Temp> *t = adj->head;
+    if (!(t->Degree() < K || precolor(t) || u->Adj()->InNodeList(t)))
+    {
+      ok = false;
+      break;
+    }
+  }
+  return ok;
+}
+/* Use Briggs. Check if the high degree nodes in the adjacent nodes 
+of the combined node(uv) are less than K */
+static bool Conservative(G::NodeList<TEMP::Temp> *nodes)
+{
+  int count = 0;
+  for (; nodes; nodes = nodes->tail)
+  {
+    if (nodes->head->Degree() >= K)
+    {
+      count = count + 1;
+    }
+  }
+  return count < K;
+}
 
-static void SelectSpill();
+static LIVE::MoveList *NodeMoves(G::Node<TEMP::Temp> *n)
+{
 
-static void MakeWorklist();
-static void Build();
+  // If n is combined now(Alias(n) != n), it doesn't matter.Because n's movelist was
+  // modified when combining.
+  LIVE::MoveList *movelist = moveListTab->Look(n);
+  return LIVE::IntersectMoveList(movelist, LIVE::UnionMoveList(activeMoves, worklistMoves));
+}
 
-static void Simplify();
-static TEMP::Map *AssignRegisters(LIVE::LiveGraph g);
+static bool MoveRelated(G::Node<TEMP::Temp> *n)
+{
+  return NodeMoves(n) != NULL;
+}
 
 Result RegAlloc(F::Frame *f, AS::InstrList *il)
 {
@@ -32,14 +77,22 @@ Result RegAlloc(F::Frame *f, AS::InstrList *il)
 
     MakeWorklist();
 
-    while (simplifyWorklist || spillWorklist)
+    while (simplifyWorklist || worklistMoves || freezeWorklist || spillWorklist)
     {
 
       if (simplifyWorklist)
       {
         Simplify();
       }
-      if (spillWorklist)
+      else if (worklistMoves)
+      {
+        Coalesce();
+      }
+      else if (freezeWorklist)
+      {
+        Freeze();
+      }
+      else if (spillWorklist)
       {
         SelectSpill();
       }
@@ -61,10 +114,10 @@ Result RegAlloc(F::Frame *f, AS::InstrList *il)
   return *ret;
 }
 
-static TEMP::Map *AssignRegisters(LIVE::LiveGraph g)
+static TEMP::Map *AssignRegisters(LIVE::LiveGraph *g)
 {
   TEMP::Map *res = TEMP::Map::Empty();
-  G::NodeList<TEMP::Temp> *nodes = (g.graph)->Nodes();
+  G::NodeList<TEMP::Temp> *nodes = (g->graph)->Nodes();
 
   res->Enter(F::F_SP(), new std::string("%rsp"));
   for (; nodes; nodes = nodes->tail)
@@ -178,7 +231,6 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil)
         {
           il = new_instr;
         }
-
       }
       last = instr;
 
@@ -218,7 +270,7 @@ void RewriteProgram(F::Frame *f, AS::InstrList *pil)
 
 static void MakeWorklist()
 {
-  G::NodeList<TEMP::Temp> *nodes = (live.graph)->Nodes();
+  G::NodeList<TEMP::Temp> *nodes = (live->graph)->Nodes();
 
   for (; nodes; nodes = nodes->tail)
   {
@@ -234,6 +286,10 @@ static void MakeWorklist()
     {
       spillWorklist = new G::NodeList<TEMP::Temp>(node, spillWorklist);
     }
+    else if (MoveRelated(node))
+    {
+      freezeWorklist = new G::NodeList<TEMP::Temp>(node, freezeWorklist);
+    }
     else
     {
       simplifyWorklist = new G::NodeList<TEMP::Temp>(node, simplifyWorklist);
@@ -244,18 +300,39 @@ static void Build()
 {
   simplifyWorklist = NULL;
   //degree >= K
+
+  freezeWorklist = NULL;
   spillWorklist = NULL;
 
   spilledNodes = NULL;
+  coalescedNodes = NULL;
+  coloredNodes = NULL;
 
   selectStack = NULL;
-  colorTab = new G::Table<TEMP::Temp, int>();
 
-  G::NodeList<TEMP::Temp> *nodes = (live.graph)->Nodes();
+  /****************** Move Sets ****************/
+  //All move instructions is in one of the sets below.
+  //Already coalesced moves
+  coalescedMoves = NULL;
+  //Moves whose src and dst interfere.
+  constrainedMoves = NULL;
+  //Moves don't need to coalesce.
+  frozenMoves = NULL;
+  //Moves likely to be coalesced later.
+  worklistMoves = live->moves;
+  //Moves not ready to be coalesced (Do not satisfy Briggs or George)
+  activeMoves = NULL;
+
+  degreeTab = new G::Table<TEMP::Temp, int>();
+  colorTab = new G::Table<TEMP::Temp, int>();
+  moveListTab = new G::Table<TEMP::Temp, LIVE::MoveList>();
+  aliasTab = new G::Table<TEMP::Temp, G::Node<TEMP::Temp>>();
+
+  G::NodeList<TEMP::Temp> *nodes = (live->graph)->Nodes();
   for (; nodes; nodes = nodes->tail)
   {
     TEMP::Temp *temp = nodes->head->NodeInfo();
-    int *color;
+    int *color = new int;
     if (temp == F::F_RAX())
       *color = 1;
     else if (temp == F::F_RBX())
@@ -288,10 +365,59 @@ static void Build()
       *color = 15;
     else
       *color = 0; //Temp register
+
     colorTab->Enter(nodes->head, color);
+
+    int *degree = new int;
+    *degree = nodes->head->Degree();
+    degreeTab->Enter(nodes->head, degree);
+    /* Initial alias table */
+    G::Node<TEMP::Temp> *alias = nodes->head;
+    aliasTab->Enter(nodes->head, alias);
+
+    /* Initial movelist table*/
+    LIVE::MoveList *list = worklistMoves;
+    LIVE::MoveList *movelist = NULL;
+    for (; list; list = list->tail)
+    {
+      if (list->src == nodes->head || list->dst == nodes->head)
+      {
+        movelist = new LIVE::MoveList(list->src, list->dst, movelist);
+      }
+    }
+    moveListTab->Enter(nodes->head, movelist);
   }
 }
+static void EnableMoves(G::NodeList<TEMP::Temp> *nodes)
+{
+  for (; nodes; nodes = nodes->tail)
+  {
+    for (LIVE::MoveList *m = NodeMoves(nodes->head); m; m = m->tail)
+    {
+      if (LIVE::isinMoveList(m->src, m->dst, activeMoves))
+      {
+        activeMoves = LIVE::SubMoveList(activeMoves, new LIVE::MoveList(m->src, m->dst, NULL));
+        worklistMoves = new LIVE::MoveList(m->src, m->dst, worklistMoves);
+      }
+    }
+  }
+}
+static G::Node<TEMP::Temp> *alias(G::Node<TEMP::Temp> *n)
+{
+  return aliasTab->Look(n);
+}
 
+static G::Node<TEMP::Temp> *GetAlias(G::Node<TEMP::Temp> *t)
+{
+  if (coalescedNodes->InNodeList(t))
+  {
+    return GetAlias(alias(t));
+  }
+  else
+  {
+    return t;
+  }
+}
 static void AssignColors()
 {
   bool okColors[K + 1];
@@ -325,20 +451,79 @@ static void AssignColors()
     }
     if (realSpill)
     {
-      spilledNodes = new G::NodeList<TEMP::Temp>(n, spilledNodes);
+      spilledNodes = new G::NodeList<TEMP::Temp>(n, spilledNodes); 
+      printf("-------====spilledNodes temp :%d=====-----\n", n->NodeInfo()->Int());
     }
     else
     {
       int *color = colorTab->Look(n);
       *color = i;
+      printf("-------====assign color temp :%d=====-----\n", n->NodeInfo()->Int());
     }
+  }
+  for (G::NodeList<TEMP::Temp> *p = live->graph->mynodes; p; p = p->tail)
+  {
+    colorTab->Enter(p->head, colorTab->Look(GetAlias(p->head)));
   }
 }
 
 static void SelectSpill()
 {
+
+  G::Node<TEMP::Temp> *m = NULL;
+  //calculate spilling weight
+  int max = 0;
+
+  for (G::NodeList<TEMP::Temp> *spill = spillWorklist; spill; spill = spill->tail)
+  {
+    TEMP::Temp *t = spill->head->NodeInfo();
+    if (intemp(notSpillTemps, t))
+    {
+      continue;
+    }
+    if (spill->head->Degree() > max)
+    {
+      m = spill->head;
+      max = m->Degree();
+    }
+  }
+  if (m)
+  {
+    spillWorklist = G::NodeList<TEMP::Temp>::SubList(spillWorklist, new G::NodeList<TEMP::Temp>(m, NULL));
+    simplifyWorklist = new G::NodeList<TEMP::Temp>(m, simplifyWorklist);
+    FreezeMoves(m);
+  }
+  else
+  {
+    m = spillWorklist->head;
+    spillWorklist = spillWorklist->tail;
+    simplifyWorklist = new G::NodeList<TEMP::Temp>(m, simplifyWorklist);
+    FreezeMoves(m);
+  }
 }
 
+static void DecrementDegree(G::Node<TEMP::Temp> *n)
+{
+
+  int *degree = degreeTab->Look(n);
+  int d = *degree; // Optimization
+  *degree = *degree - 1;
+  int *color = colorTab->Look(n);
+  if (d == K && *color == 0)
+  {
+    //If n and its adjacent nodes are in activeMoves,
+    EnableMoves(new G::NodeList<TEMP::Temp>(n, n->Adj()));
+    spillWorklist = G::NodeList<TEMP::Temp>::SubList(spillWorklist, new G::NodeList<TEMP::Temp>(n, NULL));
+    if (MoveRelated(n))
+    {
+      freezeWorklist = new G::NodeList<TEMP::Temp>(n, freezeWorklist);
+    }
+    else
+    {
+      simplifyWorklist = new G::NodeList<TEMP::Temp>(n, simplifyWorklist);
+    }
+  }
+}
 static void Simplify()
 {
 
@@ -346,10 +531,135 @@ static void Simplify()
   simplifyWorklist = simplifyWorklist->tail;
   //push n to stack
   selectStack = new G::NodeList<TEMP::Temp>(node, selectStack);
-  // G_nodeList adj = Adjacent(node);
-  // for (; adj; adj = adj->tail)
-  // {
-  //   DecrementDegree(adj->head);
-  // }
+  G::NodeList<TEMP::Temp> *adj = node->Adj();
+  for (; adj; adj = adj->tail)
+  {
+    DecrementDegree(adj->head);
+  }
+  printf("-------====Simplify temp :%d=====-----\n", node->NodeInfo()->Int());
+}
+
+static void Combine(G::Node<TEMP::Temp> *u, G::Node<TEMP::Temp> *v)
+{
+  if (freezeWorklist->InNodeList(v))
+  {
+    freezeWorklist = G::NodeList<TEMP::Temp>::SubList(freezeWorklist, new G::NodeList<TEMP::Temp>(v, NULL));
+  }
+  else
+  {
+    spillWorklist = G::NodeList<TEMP::Temp>::SubList(spillWorklist, new G::NodeList<TEMP::Temp>(v, NULL));
+  }
+  coalescedNodes = new G::NodeList<TEMP::Temp>(v, coalescedNodes);
+  aliasTab->Enter(v, u);
+
+  //Combine v's movelist by u's
+  moveListTab->Enter(u, LIVE::UnionMoveList(movelist(u), movelist(v)));
+
+  //If it's necessary?
+  //EnableMoves(G_NodeList(v,NULL));
+
+  for (G::NodeList<TEMP::Temp> *adj = v->Adj(); adj; adj = adj->tail)
+  {
+    G::Node<TEMP::Temp> *t = adj->head;
+    G::Graph<TEMP::Temp>::AddEdge(t, u);
+    DecrementDegree(t);
+  }
+  if (degree(u) >= K && freezeWorklist->InNodeList(u))
+  {
+    freezeWorklist = G::NodeList<TEMP::Temp>::SubList(freezeWorklist, new G::NodeList<TEMP::Temp>(u, NULL));
+    spillWorklist = new G::NodeList<TEMP::Temp>(u, spillWorklist);
+  }
+}
+static void AddWorkList(G::Node<TEMP::Temp> *n)
+{
+  if (!precolor(n) && !MoveRelated(n) && degree(n) < K)
+  {
+    freezeWorklist = G::NodeList<TEMP::Temp>::SubList(freezeWorklist, new G::NodeList<TEMP::Temp>(n, NULL));
+    simplifyWorklist = new G::NodeList<TEMP::Temp>(n, simplifyWorklist);
+  }
+}
+static void Coalesce()
+{
+
+  printf("-------====Coalesce  =====-----\n");
+
+  G::Node<TEMP::Temp> *x, *y, *u, *v;
+  x = worklistMoves->src;
+  y = worklistMoves->dst;
+
+  //If only 1 precolored in x,y, then it must be u.
+  if (precolor(GetAlias(y)))
+  {
+    u = GetAlias(y);
+    v = GetAlias(x);
+  }
+  else
+  {
+    u = GetAlias(x);
+    v = GetAlias(y);
+  }
+  worklistMoves = worklistMoves->tail;
+
+  if (u == v)
+  {
+    coalescedMoves = new LIVE::MoveList(x, y, coalescedMoves);
+    AddWorkList(u);
+  }
+  //If u and v are both precolored or u and v is adjacent,Cannot combine them directly.
+  else if (precolor(v) || v->Adj()->InNodeList(u))
+  {
+    constrainedMoves = new LIVE::MoveList(x, y, constrainedMoves);
+    AddWorkList(u);
+    AddWorkList(v);
+  }
+  //If u and v satisfy the demands of Briggs,then combine them.
+  //Conservative uses Briggs
+  //OK uses George
+  else if ((precolor(u) && OK(v, u)) || (!precolor(u) && Conservative(G::NodeList<TEMP::Temp>::UnionNodeList(u->Adj(), v->Adj()))))
+  {
+    coalescedMoves = new LIVE::MoveList(x, y, coalescedMoves);
+    Combine(u, v);
+    AddWorkList(u);
+  }
+  //Can't coalesce now
+  else
+  {
+    activeMoves = new LIVE::MoveList(x, y, activeMoves);
+  }
+}
+static void FreezeMoves(G::Node<TEMP::Temp> *u)
+{
+  for (LIVE::MoveList *m = NodeMoves(u); m; m = m->tail)
+  {
+    G::Node<TEMP::Temp> *x = m->src;
+    G::Node<TEMP::Temp> *y = m->dst;
+
+    //v is the Move neighbor of u.
+    G::Node<TEMP::Temp> *v;
+    if (GetAlias(y) == GetAlias(u))
+    {
+      v = GetAlias(x);
+    }
+    else
+    {
+      v = GetAlias(y);
+    }
+    activeMoves = LIVE::SubMoveList(activeMoves, new LIVE::MoveList(x, y, NULL));
+    frozenMoves = new LIVE::MoveList(x, y, frozenMoves);
+    if (NodeMoves(v) == NULL && degree(v) < K)
+    {
+      freezeWorklist = G::NodeList<TEMP::Temp>::SubList(freezeWorklist, new G::NodeList<TEMP::Temp>(v, NULL));
+      simplifyWorklist = new G::NodeList<TEMP::Temp>(v, simplifyWorklist);
+    }
+  }
+}
+static void Freeze()
+{
+
+  printf("-------====Freeze=====-----\n");
+  G::Node<TEMP::Temp> *u = freezeWorklist->head;
+  freezeWorklist = freezeWorklist->tail;
+  simplifyWorklist = new G::NodeList<TEMP::Temp>(u, simplifyWorklist);
+  FreezeMoves(u);
 }
 } // namespace RA

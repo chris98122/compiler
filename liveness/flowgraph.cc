@@ -87,7 +87,7 @@ G::Graph<AS::Instr> *AssemFlowGraph(AS::InstrList *il, F::Frame *f)
   {
     cur = nodes->head;
     instr = cur->NodeInfo();
-    if (instr->kind == AS::Instr::OPER  && ((AS::OperInstr *)instr)->jumps->labels )
+    if (instr->kind == AS::Instr::OPER  && ((AS::OperInstr *)instr)->jumps && ((AS::OperInstr *)instr)->jumps->labels )
     {
       TEMP::LabelList* labels = ((AS::OperInstr *)instr)->jumps->labels;
       for (; labels; labels = labels->tail)
