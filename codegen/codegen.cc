@@ -50,17 +50,16 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
   case T::MUL_OP:
   {
     emit(new AS::MoveInstr("movq `s0, `d0", L(r, NULL), L(left, NULL)));
-    emit(new AS::OperInstr("imulq `s0", L(r, NULL), L(right, NULL), new AS::Targets(nullptr)));
+    emit(new AS::OperInstr("imulq `s0,`d0", L(r, NULL), L(right, NULL), new AS::Targets(nullptr)));
 
     return r;
   }
-  case T::DIV_OP:
+  case T::DIV_OP: 
   {
-    TEMP::TempList *divident = L(F::F_RAX(), L(F::F_RDX(), NULL));
     emit(new AS::MoveInstr("movq `s0, `d0", L(F::F_RAX(), NULL), L(left, NULL)));
-    emit(new AS::OperInstr("cltd", divident, L(F::F_RAX(), NULL), new AS::Targets(nullptr)));
-    emit(new AS::OperInstr("idivq `s0", nullptr,
-                           L(right, nullptr), new AS::Targets(NULL)));
+    emit(new AS::OperInstr("cltd", L(F::F_RAX(), L(F::F_RDX(),NULL)), L(F::F_RAX(),NULL), new AS::Targets(nullptr)));
+    emit(new AS::OperInstr("idivq `s0", NULL,
+                           L(right,NULL), new AS::Targets((NULL))));
     emit(new AS::MoveInstr("movq `s0, `d0", L(r, NULL), L(F::F_RAX(), NULL)));
     return r;
   }
@@ -71,7 +70,7 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
       int rightvalue = ((T::ConstExp *)(exp->right))->consti;
       std::string instr;
       std::stringstream ioss;
-      ioss << "leaq (" + fs + "-0x" << std::hex << rightvalue << ")(`s0),`d0";
+      ioss << "leaq (" + fs + "-0x" << std::hex << -rightvalue << ")(`s0),`d0";
 
       instr = ioss.str();
       emit(new AS::OperInstr(instr,
@@ -83,7 +82,7 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
       emit(new AS::MoveInstr("movq `s0, `d0",
                              L(r, NULL), L(left, NULL)));
       emit(new AS::OperInstr(op + "`s0, `d0", L(r, nullptr),
-                             L(right,nullptr), new AS::Targets((NULL))));
+                             L(right, L(r, nullptr)), new AS::Targets((NULL))));
     }
     return r;
     break;
@@ -93,7 +92,7 @@ static TEMP::Temp *munchOpExp(T::BinopExp *exp)
     emit(new AS::MoveInstr("movq `s0, `d0",
                            L(r, NULL), L(left, NULL)));
     emit(new AS::OperInstr(op + "`s0, `d0", L(r, nullptr),
-                           L(right, nullptr), new AS::Targets((NULL))));
+                           L(right, L(r, nullptr)), new AS::Targets((NULL))));
     return r;
     break;
   }
@@ -130,26 +129,27 @@ static TEMP::Temp *munchMemExp(T::MemExp *exp)
       int offset = ((T::ConstExp *)right)->consti;
       std::string instr;
       std::stringstream ioss;
-      ioss << "movq (" + fs + "-" << std::hex << -offset << ")(`s0),`d0";
+      ioss << "#BINOP F_FP munch mem\nmovq (" + fs + "-0x" << std::hex << -offset << ")(`s0),`d0";
 
       instr = ioss.str();
       emit(new AS::OperInstr(instr,
                              L(r, nullptr), L(F::F_SP(), nullptr), new AS::Targets(NULL)));
+      return r;
     }
     else
     {
       TEMP::Temp *lefttemp = munchExp(left);
       TEMP::Temp *righttemp = munchExp(right);
-      emit(new AS::OperInstr("addq `s0,`d0", L(righttemp, NULL),
-                             L(lefttemp, NULL), new AS::Targets(NULL)));
-      emit(new AS::OperInstr("movq (`s0),`d0", L(r, NULL), L(righttemp, NULL), new AS::Targets(NULL)));
+      emit(new AS::OperInstr("#BINOP munch mem\naddq `s0,`d0", L(righttemp, NULL),
+                             L(lefttemp, L(righttemp, NULL)), new AS::Targets(NULL)));
+      emit(new AS::OperInstr("#BINOP munch mem\nmovq (`s0),`d0", L(r, NULL), L(righttemp, NULL), new AS::Targets(NULL)));
       return r;
     }
   }
   default:
   {
     TEMP::Temp *s = munchExp(e);
-    emit(new AS::MoveInstr("movq (`s0), `d0",
+    emit(new AS::MoveInstr("#  munch mem\nmovq (`s0), `d0",
                            L(r, NULL), L(s, NULL)));
     return r;
   }
@@ -160,7 +160,7 @@ static TEMP::Temp *munchMemExp(T::MemExp *exp)
 static TEMP::Temp *munchNameExp(T::NameExp *exp)
 {
   TEMP::Temp *r = TEMP::Temp::NewTemp();
-  std::string assem = "movq $" + exp->name->Name() + ",`d0";
+  std::string assem = "leaq " + exp->name->Name() + "(%rip),`d0";
   emit(new AS::OperInstr(assem,
                          L(r, NULL), NULL, new AS::Targets(nullptr)));
   return r;
@@ -169,6 +169,8 @@ static void munchArgs(T::ExpList *list)
 {
   int num = 1;
   TEMP::Temp *arg = TEMP::Temp::NewTemp();
+
+  
   for (T::ExpList *l = list; l; l = l->tail, num++)
   {
     arg = munchExp(l->head);
@@ -223,7 +225,7 @@ static TEMP::Temp *munchCallExp(T::CallExp *exp)
   emit(new AS::OperInstr(assem, F::F_callerSaveRegs(), nullptr, new AS::Targets(NULL)));
 
   TEMP::Temp *r = TEMP::Temp::NewTemp();
-  emit(new AS::MoveInstr("movq `s0, `d0", L(r, NULL),
+  emit(new AS::MoveInstr("#return value\nmovq `s0, `d0", L(r, NULL),
                          L(F::F_RAX(), NULL)));
 
   return r;
@@ -290,7 +292,7 @@ static void munchMoveStm(T::MoveStm *stm)
     TEMP::Temp *left = munchExp(src);
 
     TEMP::Temp *right = munchExp(((T::MemExp *)dst)->exp);
-    emit(new AS::MoveInstr("movq `s0,(`s1)", NULL,
+    emit(new AS::MoveInstr("movq `s0, (`s1)", NULL,
                            L(left, L(right, NULL))));
     return;
   }
@@ -388,14 +390,14 @@ static void restoreCalleeRegs(void)
   emit(new AS::MoveInstr("movq `s0,`d0", L(F::F_R13(), NULL), L(savedr13, NULL)));
   emit(new AS::MoveInstr("movq `s0,`d0", L(F::F_R14(), NULL), L(savedr14, NULL)));
   emit(new AS::MoveInstr("movq `s0,`d0", L(F::F_R15(), NULL), L(savedr15, NULL)));
-}
-
+} 
 AS::InstrList *Codegen(F::Frame *f, T::StmList *stmList)
 {
   // TODO: Put your codes here (lab6).
   fs = TEMP::LabelString(f->label) + "_framesize";
   instrList = NULL;
   saveCalleeRegs();
+  //push reg in stack
   for (; stmList; stmList = stmList->tail)
   {
     munchStm(stmList->head);

@@ -14,9 +14,9 @@ static void indent(FILE *out, int d)
 static char bin_oper[][12] = {"PLUS", "MINUS", "TIMES", "DIVIDE", "AND",
                               "OR", "LSHIFT", "RSHIFT", "ARSHIFT", "XOR"};
 
-static char rel_oper[][12] = {"EQ", "NE", "LT", "GT", "LE",
+static char rel_oper[][12] = {"EQ", "NE", "LT", "LE", "GT",
                               "GE", "ULT", "ULE", "UGT", "UGE"};
-
+ 
 } // namespace
 
 namespace T
