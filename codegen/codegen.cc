@@ -368,7 +368,6 @@ static void munchStm(T::Stm *stm)
 
 static void saveCalleeRegs()
 {
-
   savedrbx = TEMP::Temp::NewTemp();
   savedrbp = TEMP::Temp::NewTemp(); //Saved rbp here.
   savedr12 = TEMP::Temp::NewTemp();

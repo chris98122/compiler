@@ -175,7 +175,6 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
   T::StmList *v_tail = view_shift;
   F::AccessList *f_tail = formals;
   bool escape;
-  TEMP::Temp *temp = TEMP::Temp::NewTemp();
 
   int formal_off = wordsize; // The seventh arg was located at 8(%rbp)
   /*If the formal is escape, then allocate it on the frame.
@@ -273,6 +272,49 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
     else
     {
       //allocate it on the temp
+
+      TEMP::Temp *temp = TEMP::Temp::NewTemp();
+      switch (num)
+      {
+      case 0:
+        v_tail->tail = new T::StmList(new T::MoveStm(new T::TempExp(temp), new T::TempExp(F_RDI())), NULL);
+        v_tail = v_tail->tail;
+        f_tail->tail = new AccessList(new InRegAccess(temp), NULL);
+        f_tail = f_tail->tail;
+        break;
+      case 1:
+        v_tail->tail = new T::StmList(new T::MoveStm(new T::TempExp(temp), new T::TempExp(F_RSI())), NULL);
+        v_tail = v_tail->tail;
+        f_tail->tail = new AccessList(new InRegAccess(temp), NULL);
+        f_tail = f_tail->tail;
+        break;
+      case 2:
+        v_tail->tail = new T::StmList(new T::MoveStm(new T::TempExp(temp), new T::TempExp(F_RDX())), NULL);
+        v_tail = v_tail->tail;
+        f_tail->tail = new AccessList(new InRegAccess(temp), NULL);
+        f_tail = f_tail->tail;
+        break;
+      case 3:
+        v_tail->tail = new T::StmList(new T::MoveStm(new T::TempExp(temp), new T::TempExp(F_RCX())), NULL);
+        v_tail = v_tail->tail;
+        f_tail->tail = new AccessList(new InRegAccess(temp), NULL);
+        f_tail = f_tail->tail;
+        break;
+      case 4:
+        v_tail->tail = new T::StmList(new T::MoveStm(new T::TempExp(temp), new T::TempExp(F_R8())), NULL);
+        v_tail = v_tail->tail;
+        f_tail->tail = new AccessList(new InRegAccess(temp), NULL);
+        f_tail = f_tail->tail;
+        break;
+      case 5:
+        v_tail->tail = new T::StmList(new T::MoveStm(new T::TempExp(temp), new T::TempExp(F_R9())), NULL);
+        v_tail = v_tail->tail;
+        f_tail->tail = new AccessList(new InRegAccess(temp), NULL);
+        f_tail = f_tail->tail;
+        break;
+      default:
+        printf("Frame: the 7-nth formal should be passed on frame.");
+      }
     }
   }
 
