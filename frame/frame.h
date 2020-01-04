@@ -101,6 +101,13 @@ public:
   AccessList *tail;
 
   AccessList(Access *head, AccessList *tail) : head(head), tail(tail) {}
+  void print()
+  {
+    for(  AccessList *p = this; p ; p = p->tail)
+    { 
+      printf("%d," ,p->head->kind);
+    }
+  }
 };
 
 /*

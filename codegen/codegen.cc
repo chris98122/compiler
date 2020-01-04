@@ -111,6 +111,7 @@ static TEMP::Temp *munchConstExp(T::ConstExp *exp)
   emit(new AS::OperInstr("movq $" + std::to_string(exp->consti) + " ,`d0",
                          L(r, nullptr),
                          NULL, NULL));
+  printf("temp int :%d , const val:%d \n",r->Int(),exp->consti);
   return r;
 }
 static TEMP::Temp *munchMemExp(T::MemExp *exp)

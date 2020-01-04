@@ -345,7 +345,7 @@ static void Build()
       *color = 5;
     else if (temp == F::F_RDI())
       *color = 6;
-    else if (temp == F::F_RBP())
+    else if (temp == F::F_R15())
       *color = 7;
     else if (temp == F::F_R8())
       *color = 8;
@@ -361,7 +361,7 @@ static void Build()
       *color = 13;
     else if (temp == F::F_R14())
       *color = 14;
-    else if (temp == F::F_R15())
+    else if (temp == F::F_RBP())
       *color = 15;
     else
       *color = 0; //Temp register
@@ -437,6 +437,8 @@ static void AssignColors()
     {
       int *color = colorTab->Look(succs->head);
       okColors[*color] = false;
+      // debug
+      //printf("-------==== %d->Succ()  %d =====-----\n", n->NodeInfo()->Int(), succs->head->NodeInfo()->Int());
     }
 
     int i;
@@ -451,14 +453,14 @@ static void AssignColors()
     }
     if (realSpill)
     {
-      spilledNodes = new G::NodeList<TEMP::Temp>(n, spilledNodes); 
+      spilledNodes = new G::NodeList<TEMP::Temp>(n, spilledNodes);
       printf("-------====spilledNodes temp :%d=====-----\n", n->NodeInfo()->Int());
     }
     else
     {
       int *color = colorTab->Look(n);
       *color = i;
-      printf("-------====assign color temp :%d=====-----\n", n->NodeInfo()->Int());
+      printf("-------==== assign temp :%d to color %d =====-----\n", n->NodeInfo()->Int(), *color);
     }
   }
   for (G::NodeList<TEMP::Temp> *p = live->graph->mynodes; p; p = p->tail)
@@ -562,6 +564,7 @@ static void Combine(G::Node<TEMP::Temp> *u, G::Node<TEMP::Temp> *v)
   {
     G::Node<TEMP::Temp> *t = adj->head;
     G::Graph<TEMP::Temp>::AddEdge(t, u);
+    G::Graph<TEMP::Temp>::AddEdge(u,t);
     DecrementDegree(t);
   }
   if (degree(u) >= K && freezeWorklist->InNodeList(u))
@@ -580,8 +583,6 @@ static void AddWorkList(G::Node<TEMP::Temp> *n)
 }
 static void Coalesce()
 {
-
-  printf("-------====Coalesce  =====-----\n");
 
   G::Node<TEMP::Temp> *x, *y, *u, *v;
   x = worklistMoves->src;
@@ -619,6 +620,7 @@ static void Coalesce()
   {
     coalescedMoves = new LIVE::MoveList(x, y, coalescedMoves);
     Combine(u, v);
+    printf("-------====Coalesce %d,%d =====-----\n", u->NodeInfo()->Int(), v->NodeInfo()->Int());
     AddWorkList(u);
   }
   //Can't coalesce now

@@ -3,6 +3,7 @@
 namespace FG
 {
 
+void showinfo(AS::Instr *a);
 TEMP::TempList *Def(G::Node<AS::Instr> *n)
 {
   // TODO: Put your codes here (lab6).
@@ -87,14 +88,14 @@ G::Graph<AS::Instr> *AssemFlowGraph(AS::InstrList *il, F::Frame *f)
   {
     cur = nodes->head;
     instr = cur->NodeInfo();
-    if (instr->kind == AS::Instr::OPER  && ((AS::OperInstr *)instr)->jumps && ((AS::OperInstr *)instr)->jumps->labels )
+    if (instr->kind == AS::Instr::OPER && ((AS::OperInstr *)instr)->jumps && ((AS::OperInstr *)instr)->jumps->labels)
     {
-      TEMP::LabelList* labels = ((AS::OperInstr *)instr)->jumps->labels;
+      TEMP::LabelList *labels = ((AS::OperInstr *)instr)->jumps->labels;
       for (; labels; labels = labels->tail)
-      { 
-        G::Node<AS::Instr> *target =  labelmap->Look(labels->head);
+      {
+        G::Node<AS::Instr> *target = labelmap->Look(labels->head);
         if (target)
-          flowgragh->AddEdge(cur, target); 
+          flowgragh->AddEdge(cur, target);
         else
         {
           printf("Cannot find label %s\nSee in runtime.s or undefined label\n", TEMP::LabelString(labels->head)); //For debugging
@@ -102,7 +103,34 @@ G::Graph<AS::Instr> *AssemFlowGraph(AS::InstrList *il, F::Frame *f)
       }
     }
   }
+
+  //debug
+  //flowgragh->Show(stdout, flowgragh->mynodes, showinfo);
   return flowgragh;
+}
+
+void showinfo(AS::Instr *a)
+{
+  std::string p;
+  switch (a->kind)
+  {
+  case AS::Instr::OPER:
+  {
+    p = ((AS::OperInstr *)a)->assem;
+    break;
+  }
+  case AS::Instr::LABEL:
+  {
+    p = ((AS::LabelInstr *)a)->assem + TEMP::LabelString(((AS::LabelInstr *)a)->label);
+    break;
+  }
+  case AS::Instr::MOVE:
+  {
+    p = ((AS::MoveInstr *)a)->assem;
+    break;
+  }
+  }
+  printf(" %s \n", p.c_str());
 }
 
 } // namespace FG

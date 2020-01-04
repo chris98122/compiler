@@ -27,7 +27,7 @@ static void traverseVar(S::Table<ESC::EscapeEntry> *escapeEnv, A::Var *var, int 
     ESC::EscapeEntry *entry = escapeEnv->Look(((A::SimpleVar *)var)->sym);
     if (depth > entry->depth)
     {
-      (*entry->escape) = true;
+      (*(entry->escape)) = true;
     }
     break;
   }
@@ -51,7 +51,7 @@ static void traverseDec(S::Table<ESC::EscapeEntry> *escapeEnv, A::Dec *dec, int 
   case A::Dec::VAR:
   {
     ((A::VarDec *)dec)->escape = false;
-    escapeEnv->Enter(((A::VarDec *)dec)->var, new ESC::EscapeEntry(level, &((A::VarDec *)dec)->escape));
+    escapeEnv->Enter(((A::VarDec *)dec)->var, new ESC::EscapeEntry(level, &(((A::VarDec *)dec)->escape)));
     traverseExp(escapeEnv, ((A::VarDec *)dec)->init, level);
     break;
   }

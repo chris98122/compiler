@@ -196,10 +196,10 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
                                                   T::PLUS_OP, new T::TempExp(F::F_FP()), new T::ConstExp(newframe->s_offset))),
                                           new T::TempExp(F_RDI())),
                                       NULL);
-        newframe->s_offset -= wordsize;
         f_tail->tail = new AccessList(new F::InFrameAccess(newframe->s_offset), NULL);
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
+        newframe->s_offset -= wordsize;
         break;
       case 1:
         v_tail->tail = new T::StmList(new T::MoveStm(
@@ -208,10 +208,10 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
                                                   T::PLUS_OP, new T::TempExp(F::F_FP()), new T::ConstExp(newframe->s_offset))),
                                           new T::TempExp(F_RSI())),
                                       NULL);
-        newframe->s_offset -= wordsize;
         f_tail->tail = new AccessList(new F::InFrameAccess(newframe->s_offset), NULL);
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
+        newframe->s_offset -= wordsize;
         break;
       case 2:
         v_tail->tail = new T::StmList(new T::MoveStm(
@@ -220,10 +220,10 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
                                                   T::PLUS_OP, new T::TempExp(F::F_FP()), new T::ConstExp(newframe->s_offset))),
                                           new T::TempExp(F_RDX())),
                                       NULL);
-        newframe->s_offset -= wordsize;
         f_tail->tail = new AccessList(new F::InFrameAccess(newframe->s_offset), NULL);
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
+        newframe->s_offset -= wordsize;
         break;
       case 3:
         v_tail->tail = new T::StmList(new T::MoveStm(
@@ -232,10 +232,10 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
                                                   T::PLUS_OP, new T::TempExp(F::F_FP()), new T::ConstExp(newframe->s_offset))),
                                           new T::TempExp(F_RCX())),
                                       NULL);
-        newframe->s_offset -= wordsize;
         f_tail->tail = new AccessList(new F::InFrameAccess(newframe->s_offset), NULL);
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
+        newframe->s_offset -= wordsize;
         break;
       case 4:
         v_tail->tail = new T::StmList(new T::MoveStm(
@@ -244,10 +244,10 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
                                                   T::PLUS_OP, new T::TempExp(F::F_FP()), new T::ConstExp(newframe->s_offset))),
                                           new T::TempExp(F_R8())),
                                       NULL);
-        newframe->s_offset -= wordsize;
         f_tail->tail = new AccessList(new F::InFrameAccess(newframe->s_offset), NULL);
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
+        newframe->s_offset -= wordsize;
         break;
       case 5:
         v_tail->tail = new T::StmList(new T::MoveStm(
@@ -256,10 +256,10 @@ Frame *F_newFrame(TEMP::Label *name, U::BoolList *escapes)
                                                   T::PLUS_OP, new T::TempExp(F::F_FP()), new T::ConstExp(newframe->s_offset))),
                                           new T::TempExp(F_R9())),
                                       NULL);
-        newframe->s_offset -= wordsize;
         f_tail->tail = new AccessList(new F::InFrameAccess(newframe->s_offset), NULL);
         f_tail = f_tail->tail;
         v_tail = v_tail->tail;
+        newframe->s_offset -= wordsize;
         break;
       default:
       {
@@ -328,7 +328,7 @@ T::Stm *F_procEntryExit1(Frame *frame, T::Stm *stm)
   FILE *out = stdout;
   frame->view_shift->Print(out);
 
-  printf("------====view_shift=====-------\n");
+  //printf("------====view_shift=====-------\n");
 
   T::StmList *iter = frame->view_shift;
   T::SeqStm *res = new T::SeqStm(stm, new T::ExpStm(new T::ConstExp(0)));
@@ -377,6 +377,9 @@ F::Access *F_allocLocal(Frame *frame, bool escape)
   else
   {
     local = new F::InRegAccess(TEMP::Temp::NewTemp());
+
+    //debug
+    //printf("RegAccess %d", ((InRegAccess *)local)->reg->Int());
   }
   return local;
 }

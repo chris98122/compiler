@@ -4,6 +4,7 @@
 namespace LIVE
 {
 
+void printassem(AS::Instr *a);
 TEMP::TempList *UnionSets(TEMP::TempList *left, TEMP::TempList *right)
 {
   TEMP::TempList *unionn = left;
@@ -66,8 +67,14 @@ void get_in_out(G::Graph<AS::Instr> *flowgraph)
   bool fixed_point = false;
 
   /* calculate in out templist*/
+  int count = 0;
   while (!fixed_point)
   {
+    //debug
+
+    count++;
+    //printf("\n-------====the liveness iteration%d====-------\n", count);
+
     fixed_point = true;
     flownodes = flowgraph->mynodes;
     for (; flownodes; flownodes = flownodes->tail)
@@ -81,6 +88,7 @@ void get_in_out(G::Graph<AS::Instr> *flowgraph)
  			out[n] = (for s in succ[n])
 			            Union(in[s])
 			*/
+
       G::NodeList<AS::Instr> *succ = flownode->Succ();
       for (; succ; succ = succ->tail)
       {
@@ -97,6 +105,16 @@ void get_in_out(G::Graph<AS::Instr> *flowgraph)
       /* Update in_n and out_n*/
       in->Enter(flownode, in_n);
       out->Enter(flownode, out_n);
+
+      //debug
+      // if (count >= 31)
+      // {
+      //   printassem(flownode->NodeInfo());
+      //   printf("\nin:");
+      //   in_n->print();
+      //   printf("      out:");
+      //   out_n->print();
+      // }
     }
   }
 }
@@ -113,6 +131,12 @@ void add_hardreg(G::Graph<TEMP::Temp> *g)
                                                                                                                                                                                                                                                                                                                         new TEMP::TempList(F::F_R9(),
                                                                                                                                                                                                                                                                                                                                            new TEMP::TempList(F::F_R10(),
                                                                                                                                                                                                                                                                                                                                                               new TEMP::TempList(F::F_R11(), NULL)))))))))))))));
+  // //debug
+  // for (TEMP::TempList *t = hardreg; t; t = t->tail)
+  // {
+  //   printf(" %d ", t->head->Int());
+  // }
+  // printf("\n");
   for (TEMP::TempList *t = hardreg; t; t = t->tail)
   {
     temptable->Enter(t->head, g->NewNode(t->head));
@@ -261,6 +285,11 @@ bool isinMoveList(G::Node<TEMP::Temp> *src, G::Node<TEMP::Temp> *dst, MoveList *
   return false;
 }
 
+void showinfo(TEMP::Temp *t)
+{
+  printf(" %d ", t->Int());
+}
+
 LiveGraph *Liveness(G::Graph<AS::Instr> *flowgraph)
 {
   // TODO: Put your codes here (lab6).
@@ -285,6 +314,8 @@ LiveGraph *Liveness(G::Graph<AS::Instr> *flowgraph)
   /* Add edge between temp register node. */
   edge_temp(flowgraph, lg);
 
+  //debug
+  //lg->graph->Show(stdout, lg->graph->mynodes, showinfo);
   return lg;
 }
 
@@ -326,4 +357,37 @@ LIVE::MoveList *SubMoveList(LIVE::MoveList *left, LIVE::MoveList *right)
   }
   return cur;
 }
+
+void printassem(AS::Instr *a)
+{
+  std::string p;
+  TEMP::TempList *dst = NULL;
+  switch (a->kind)
+  {
+  case AS::Instr::OPER:
+  {
+    p = ((AS::OperInstr *)a)->assem;
+    dst = ((AS::OperInstr *)a)->dst;
+    break;
+  }
+  case AS::Instr::LABEL:
+  {
+    p = ((AS::LabelInstr *)a)->assem + TEMP::LabelString(((AS::LabelInstr *)a)->label);
+    break;
+  }
+  case AS::Instr::MOVE:
+  {
+    p = ((AS::MoveInstr *)a)->assem;
+    dst = ((AS::MoveInstr *)a)->dst;
+    break;
+  }
+  }
+  printf("\n%s", p.c_str());
+  if (dst != NULL)
+  {
+    printf("   DEF:");
+    dst->print();
+  }
+}
+
 } // namespace LIVE

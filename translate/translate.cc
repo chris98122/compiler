@@ -223,22 +223,22 @@ F::FragList *TranslateProgram(A::Exp *root)
 
   TR::procEntryExit(main_level, mainexp.exp);
 
-  //debug
-  F::FragList *p = frags;
-  while (p && p->head)
-  {
-    if (p->head->kind == F::Frag::PROC)
-    {
+  // //debug
+  // F::FragList *p = frags;
+  // while (p && p->head)
+  // {
+  //   if (p->head->kind == F::Frag::PROC)
+  //   {
 
-      printf("------====FRAG:%s=====-------\n",
-             ((F::ProcFrag *)(p->head))->frame->label->Name().c_str());
-      T::Stm *s = ((F::ProcFrag *)(p->head))->body;
-      FILE *out = stdout;
-      s->Print(out, 0);
-    }
+  //     printf("------====FRAG:%s=====-------\n",
+  //            ((F::ProcFrag *)(p->head))->frame->label->Name().c_str());
+  //     T::Stm *s = ((F::ProcFrag *)(p->head))->body;
+  //     FILE *out = stdout;
+  //     s->Print(out, 0);
+  //   }
 
-    p = p->tail;
-  }
+  //   p = p->tail;
+  // }
   return frags;
 }
 
@@ -265,8 +265,13 @@ TR::NxExp *generate_assign(TR::Exp *leftvalue, TR::Exp *right)
 Level *Level::NewLevel(Level *parent, TEMP::Label *name,
                        U::BoolList *formals)
 {
-  // make all formals escape
+  // make first static link escape
   U::BoolList *link_added_formals = new U::BoolList(true, formals);
+
+  //debug
+  // link_added_formals->Print(stdout);
+  // printf("------=== BoolList debug====-------\n");
+
   F::Frame *frame = F::F_newFrame(name, link_added_formals);
   TR::Level *level = new Level(frame, parent);
   return level;
@@ -305,6 +310,11 @@ TR::ExpAndTy SimpleVar::Translate(S::Table<E::EnvEntry> *venv,
     level = level->parent;
   }
   T::Exp *var_mem = access->access->ToExp(frame);
+
+  //debug
+  //printf("%s ACCESS KIND %d ,  ", sym->Name().c_str(), access->access->kind);
+  // printf("--------%s :var_mem debug\n------",this->sym->Name().c_str());
+  // var_mem->Print(stdout,0);
 
   return TR::ExpAndTy(new TR::ExExp(var_mem), ((E::VarEntry *)entry)->ty);
 }
@@ -361,7 +371,7 @@ TR::ExpAndTy SubscriptVar::Translate(S::Table<E::EnvEntry> *venv,
   TR::ExExp *frame = (TR::ExExp *)(var_exp_ty.exp);
   T::MemExp *subvar_mem = new T::MemExp(new T::BinopExp(T::PLUS_OP, frame->UnEx(),
                                                         new T::BinopExp(T::MUL_OP, subscript_exp_ty.exp->UnEx(), new T::ConstExp(wordsize)))); //static link is the first escaped arg;
- 
+
   return TR::ExpAndTy(new TR::ExExp(subvar_mem), var_exp_ty.ty);
 }
 
@@ -413,6 +423,12 @@ TR::ExpAndTy CallExp::Translate(S::Table<E::EnvEntry> *venv,
 
   TR::Level *callee = ((E::FunEntry *)value)->level;
   // TY::TyList *func_arg_type_list = ((E::FunEntry *)value)->formals;
+
+  // printf("------===callee frame formals debug====-------\n");
+  // F::AccessList *formal_accesslist = callee->frame->formals;
+
+  // formal_accesslist->print();
+
   ExpList *arg_list = this->args;
 
   T::ExpList *targs = new T::ExpList(NULL, NULL);
@@ -684,6 +700,8 @@ TR::ExpAndTy ForExp::Translate(S::Table<E::EnvEntry> *venv,
   TEMP::Label *incloop_label = TEMP::NewLabel();
   TEMP::Label *body_label = TEMP::NewLabel();
   TEMP::Label *done = TEMP::NewLabel();
+  //debug
+
   TR::Access *iter_access = TR::Access::AllocLocal(level, this->escape);
   //VarEntry
 
@@ -823,11 +841,22 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
     }
     U::BoolList *args = makeFormalEscList(f->params);
 
+    //debug
+    // args->Print(stdout);
+    // printf("------=== args BoolList debug====-------\n");
+
     TR::Level *newlevel = TR::Level::NewLevel(level, TEMP::NamedLabel(f->name->Name()), args);
     TY::TyList *formalTys = make_formal_tylist(tenv, f->params);
     TEMP::Label *func_label = TEMP::NamedLabel(f->name->Name());
     assert(func_label);
     venv->Enter(f->name, new E::FunEntry(newlevel, func_label, formalTys, resultTy));
+
+
+      //debug
+    // if(newlevel->frame->label->Name() == "a")
+    // {
+    //   printf("offset %d",newlevel->frame->s_offset);
+    // }
     fd = fd->tail;
   }
   fd = this->functions;
@@ -847,13 +876,28 @@ TR::Exp *FunctionDec::Translate(S::Table<E::EnvEntry> *venv,
     TR::Level *func_level = ((E::FunEntry *)funentry)->level;
 
     F::Frame *frame = func_level->frame;
+ 
+
     F::AccessList *formal_accesslist = frame->formals;
+
+    // formal_accesslist->print();
+
     //formal enter the venv
 
     // //DEBUG
     //    FILE *out = stdout;
     //    A::FieldList::Print(out, f->params, 10);
     // //DEBUG
+
+    // printf("------===%s dec frame formals debug====-------\n",frame->label->Name().c_str());
+    // for (F::AccessList *p = formal_accesslist; p; p = p->tail)
+    // {
+    //   T::Exp *a = (p->head)->ToExp(new T::TempExp(F::F_FP()));
+    //   a->Print(stdout, 0);
+    // }
+
+    //the first formal is static link
+    formal_accesslist = formal_accesslist->tail;
     for (l = f->params, t = formalTys; l; l = l->tail, t = t->tail)
     {
       venv->Enter(l->head->name, new E::VarEntry(
@@ -883,12 +927,18 @@ TR::Exp *VarDec::Translate(S::Table<E::EnvEntry> *venv, S::Table<TY::Ty> *tenv,
   else
     type_of_var = init_exp.ty;
 
-  F::Access *varaccess = F::F_allocLocal(level->frame, this->escape);
+  printf("%s", this->var->Name().c_str());
 
-  E::VarEntry *entry = new E::VarEntry(new TR::Access(level, varaccess), type_of_var, false);
+  TR::Access *varaccess = TR::Access::AllocLocal(level, this->escape);
+  //VarEntry
+
+  E::VarEntry *entry = new E::VarEntry(varaccess, type_of_var, false);
   venv->Enter(this->var, entry);
 
-  TR::NxExp *res = TR::generate_assign(new TR::ExExp(varaccess->ToExp(new T::TempExp(F::F_FP()))), init_exp.exp);
+  //debug escape
+  //printf("---%s , escape %d----\n",var->Name().c_str(),this->escape);
+
+  TR::NxExp *res = TR::generate_assign(new TR::ExExp(varaccess->access->ToExp(new T::TempExp(F::F_FP()))), init_exp.exp);
   return res;
 }
 

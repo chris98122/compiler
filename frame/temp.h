@@ -44,6 +44,13 @@ class TempList {
   TempList *tail;
 
   TempList(Temp *h, TempList *t) : head(h), tail(t) {}
+  void print()
+  { 
+    for( TempList *p = this; p ; p = p->tail)
+    { 
+      printf("%d," ,p->head->Int());
+    }
+  }
 };
 
 class LabelList {
